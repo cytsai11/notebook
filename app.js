@@ -300,6 +300,14 @@
     els.zoomPad.hidden = false;
     els.bootCard.hidden = true;
     els.zoomer.hidden = els.scrubBar.hidden = false;
+
+    // Revealing the scrub bar takes ~70px of height back off the stage, and
+    // the book was sized against the taller stage a moment ago. Rather than
+    // patch that one case, watch the stage: any change to its box re-fits the
+    // book, which covers this, window resizes, and the rails wrapping.
+    computeFit();
+    window.dispatchEvent(new Event("resize"));   // let PageFlip re-measure
+    watchStageSize();
     syncHistoryButtons();
     els.scrubLast.textContent = String(state.pageCount);
     els.pageTotal.textContent = `of ${state.pageCount}`;
@@ -733,6 +741,21 @@
     if (state.zoom > 1) setZoom(1);
     else setZoom(2, e.clientX, e.clientY);
   });
+
+  // Sizing the book changes the book, never the stage, so this cannot loop.
+  let stageWatch = null;
+  function watchStageSize() {
+    if (stageWatch || !("ResizeObserver" in window)) return;
+    let lastW = 0, lastH = 0;
+    stageWatch = new ResizeObserver(() => {
+      const w = els.stage.clientWidth, h = els.stage.clientHeight;
+      if (!w || !h || (w === lastW && h === lastH)) return;
+      lastW = w; lastH = h;
+      computeFit();
+      window.dispatchEvent(new Event("resize"));
+    });
+    stageWatch.observe(els.stage);
+  }
 
   let resizing = false;
   window.addEventListener("resize", () => {
@@ -1891,9 +1914,10 @@
   });
 
   try {
+    // Light is the default. A notebook is a paper document, and judges may
+    // be reading in a bright room; only an explicit choice switches to dark.
     const saved = localStorage.getItem(LS.theme);
-    if (saved) document.documentElement.dataset.theme = saved;
-    else if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = saved === "dark" ? "dark" : "light";
   } catch { /* ignore */ }
 
   /* ══ Keyboard ══════════════════════════════════════════════════════════ */
