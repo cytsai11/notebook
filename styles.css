@@ -1,0 +1,1450 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Engineering notebook flip book — styles
+   Light is the default; dark is a data-theme flip on <html>.
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --acc: #ffd84d;
+  --acc-ink: #2a2410;
+
+  --bg: #eceef2;
+  --bg-2: #e2e5eb;
+  --panel: #ffffff;
+  --panel-2: #f6f7f9;
+  --line: #d5d9e0;
+  --line-soft: #e6e9ee;
+  --ink: #1b1f26;
+  --ink-2: #5b636f;
+  --ink-3: #8b929c;
+  --shadow: 0 10px 30px rgba(18, 22, 30, .13);
+  --shadow-sm: 0 2px 8px rgba(18, 22, 30, .09);
+  --focus: #2f6fd0;
+
+  --topbar-h: 62px;
+  --scrub-h: 76px;
+  --rail-w: 82px;
+  --r: 12px;
+}
+
+html[data-theme="dark"] {
+  --bg: #14171c;
+  --bg-2: #0f1216;
+  --panel: #1c2027;
+  --panel-2: #232830;
+  --line: #333a45;
+  --line-soft: #2a2f38;
+  --ink: #eef1f5;
+  --ink-2: #a8b0bc;
+  --ink-3: #7b838f;
+  --shadow: 0 12px 34px rgba(0, 0, 0, .5);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, .4);
+  --focus: #7aa9f0;
+}
+
+* { box-sizing: border-box; }
+
+/* Several things below are display:flex/grid, which would otherwise beat the
+   hidden attribute the script toggles. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* Dragging a page corner would otherwise sweep the surrounding interface
+     into a text selection. Real text stays selectable below. */
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input, textarea,
+.modal p, .modal li, .modal .keys,
+.hit-text, .row-label {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.topbar {
+  height: var(--topbar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  z-index: 30;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.badge {
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .04em;
+  color: var(--acc-ink);
+  background: var(--acc);
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.nb-title {
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nb-season {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Page navigation — the primary control, so it gets real labels */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.pbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 15px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, transform .06s;
+}
+
+.pbtn:hover:not(:disabled) { background: var(--line-soft); border-color: var(--ink-3); }
+.pbtn:active:not(:disabled) { transform: translateY(1px); }
+.pbtn:disabled { opacity: .35; cursor: default; }
+
+.pagebox {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 40px;
+  padding: 0 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.pagebox input {
+  width: 3.6ch;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  text-align: right;
+  color: var(--ink);
+  background: none;
+  border: none;
+  align-self: center;
+}
+
+.pagebox input::-webkit-outer-spin-button,
+.pagebox input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pagebox input { -moz-appearance: textfield; }
+.pagebox input:focus { outline: none; }
+.pagebox:focus-within { border-color: var(--focus); }
+
+.page-total {
+  font-size: 13px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  align-self: center;
+}
+
+.topright {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  justify-content: flex-end;
+}
+
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 13px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .12s;
+}
+
+.tbtn:hover { background: var(--panel-2); border-color: var(--line); }
+.tbtn.icon { padding: 0 10px; }
+
+.ic-moon { display: none; }
+html[data-theme="dark"] .ic-sun { display: none; }
+html[data-theme="dark"] .ic-moon { display: block; }
+
+/* ── Author-mode banner ──────────────────────────────────────────────── */
+.author-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  color: var(--acc-ink);
+  background: var(--acc);
+  border-bottom: 1px solid rgba(0, 0, 0, .15);
+  z-index: 29;
+}
+
+html[data-theme="dark"] .author-bar { color: #2a2410; }
+
+.ab-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #1b1f26;
+  flex: none;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse { 50% { opacity: .3; } }
+
+.ab-text { flex: 1; font-weight: 500; }
+
+.ab-btn {
+  height: 30px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--acc-ink);
+  background: rgba(255, 255, 255, .55);
+  border: 1px solid rgba(0, 0, 0, .2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ab-btn:hover { background: #fff; }
+.ab-btn.primary { background: #1b1f26; color: #fff; border-color: #1b1f26; }
+.ab-btn.primary:hover { background: #000; }
+
+/* ── Loading readout ─────────────────────────────────────────────────── */
+.load-chip {
+  position: absolute;
+  left: 14px;
+  bottom: 16px;
+  z-index: 14;
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stage.zoomed .load-chip { position: fixed; bottom: calc(var(--scrub-h) + 12px); }
+
+/* ── Stage ───────────────────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* No side gutter needed any more — bookmarks live on the scrub bar, so
+     the book gets the full width between the two rails. */
+  padding: 16px 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--bg) 0%, var(--bg-2) 100%);
+  overflow: hidden;
+}
+
+/* When zoomed past fit, the stage becomes the scroll viewport. The
+   scrollbars are hidden — panning is by dragging the page. */
+.stage.zoomed {
+  padding-right: 0;
+  overflow: auto;
+  align-items: flex-start;
+  justify-content: flex-start;
+  cursor: grab;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.stage::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.stage.zoomed.grabbing { cursor: grabbing; }
+
+.zoom-pad {
+  position: relative;
+  margin: auto;           /* keeps the book centred at fit size */
+  flex: none;
+}
+
+/* Zoomed in, margin:auto still centres a book narrower than the viewport
+   but collapses to 0 once it overflows — so nothing gets clipped. */
+.stage.zoomed .zoom-pad { margin: 0 auto; }
+
+/* Swallows drags while zoomed so they pan instead of trying to flip a page.
+   Absent at fit size and while a drawing tool is on. */
+.pan-catch {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: none;
+  touch-action: none;
+}
+
+.stage.zoomed .pan-catch { display: block; }
+body.drawing .pan-catch { display: none !important; }
+
+.book-wrap {
+  position: relative;
+  transform-origin: 0 0;
+}
+
+/* The re-centring slide when the book opens or closes. Only applied while
+   that shift is happening — zoom steps must land instantly, or the scaled
+   book would lag behind the pad that scrolls it. The duration matches the
+   page-turn time in app.js so the two move together. */
+.book-wrap.shift-anim { transition: transform .48s cubic-bezier(.32, .72, .3, 1); }
+
+.book { width: 100%; height: 100%; }
+
+/* Page surfaces */
+.page {
+  background: #fff;
+  overflow: hidden;
+}
+
+.page-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+/* Until a page is rasterised the img has no src — hide it so the browser
+   does not paint broken-image alt text over the placeholder. */
+.page-img:not([src]) { display: none; }
+
+.page-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+}
+
+.page-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 600;
+  color: #d3d7dd;
+  background: repeating-linear-gradient(45deg, #fafbfc 0 12px, #f4f5f7 12px 24px);
+}
+
+.link-layer { position: absolute; inset: 0; }
+
+.link-layer a {
+  position: absolute;
+  border-radius: 3px;
+  background: transparent;
+  transition: background .12s;
+}
+
+.link-layer a { cursor: pointer; }        /* internal links carry no href */
+.link-layer a:hover { background: rgba(84, 168, 240, .28); }
+.link-layer a:focus-visible { background: rgba(84, 168, 240, .28); }
+
+/* ── Link hover preview ──────────────────────────────────────────────── */
+.link-peek {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  max-width: 320px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  pointer-events: none;                   /* never blocks the link underneath */
+  animation: peek-in .12s ease-out;
+}
+
+@keyframes peek-in {
+  from { opacity: 0; transform: translateY(3px); }
+}
+
+.link-peek.is-url { max-width: 300px; }
+
+.peek-shot {
+  flex: none;
+  width: 86px;
+  aspect-ratio: 17 / 22;
+  overflow: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.peek-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.peek-shot.empty {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.peek-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.peek-meta b {
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peek-sec {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peek-sec i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.peek-url {
+  font-size: 12px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peek-hint {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.anno {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  pointer-events: none;
+}
+
+body.drawing .anno { pointer-events: auto; }
+body.drawing .link-layer { pointer-events: none; }
+body.drawing .page-inner { cursor: crosshair; }
+
+/* ── Page-turn shadows ───────────────────────────────────────────────────
+   StPageFlip draws these itself, writing an inline gradient and opacity onto
+   four sibling divs every frame of a fold. Soft pages get outer/inner, whose
+   gradient is rotated to the fold angle and clipped to the folded shape, so
+   it hugs the curve. The cover and back cover are marked hard (see
+   buildPages), and hard pages take a much blunter path: a straight gradient
+   across the whole half-spread, which is the flat grey slab with a hard
+   vertical edge.
+
+   filter: opacity() MULTIPLIES the library's own animated opacity rather than
+   replacing it, so the slab is toned down while still fading in and out with
+   the fold. Replacing opacity outright would pin it to one value. */
+.stf__hardShadow,
+.stf__hardInnerShadow { filter: opacity(.45); }
+
+/* Edge arrows */
+.edge-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 82px;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  opacity: .85;
+  transition: opacity .14s, background .14s;
+}
+
+.edge-nav:hover:not(:disabled) { opacity: 1; background: var(--panel-2); }
+.edge-nav:disabled { opacity: .2; cursor: default; }
+.edge-nav svg { width: 24px; height: 24px; }
+.edge-left { left: 12px; }
+.edge-right { right: 12px; }
+
+@media (max-width: 900px) { .edge-nav { display: none; } }
+
+/* Floating zoom control */
+.zoomer {
+  position: absolute;
+  right: 14px;
+  bottom: 16px;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.zbtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.zbtn:hover:not(:disabled) { background: var(--panel-2); }
+.zbtn:disabled { opacity: .3; cursor: default; }
+
+.zlevel {
+  min-width: 56px;
+  height: 34px;
+  font: 600 13px/1 "IBM Plex Sans", sans-serif;
+  color: var(--ink-2);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.zlevel:hover { background: var(--panel-2); color: var(--ink); }
+
+/* ── Workspace: two rails with the book between them ─────────────────── */
+.workspace {
+  position: relative;      /* the panels anchor to this, not the viewport */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.rail {
+  flex: none;
+  width: var(--rail-w);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--panel);
+  z-index: 20;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar { display: none; }
+.rail-left { border-right: 1px solid var(--line); }
+.rail-right { border-left: 1px solid var(--line); }
+
+.rail-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
+.rail-gap { flex: 1 1 auto; min-height: 12px; }
+
+/* Vertical tool buttons — icon over a real word, never an icon alone. */
+.rbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 4px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s;
+}
+
+.rbtn:hover:not(:disabled) { background: var(--panel-2); color: var(--ink); }
+.rbtn:disabled { opacity: .3; cursor: default; }
+.rbtn svg { width: 20px; height: 20px; }
+
+.rbtn[aria-pressed="true"] {
+  color: var(--acc-ink);
+  background: var(--acc);
+  border-color: rgba(0, 0, 0, .12);
+}
+
+.rbtn.accented {
+  color: var(--ink);
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+.rbtn.accented:hover { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+
+/* The rail is 82px wide with 8px padding, leaving 66px: three 18px circles
+   with 5px gaps come to 64px, so they stay on one row instead of wrapping. */
+.rail .swatches { justify-content: center; gap: 5px; padding: 4px 0 6px; }
+.rail .swatch { width: 18px; height: 18px; border-width: 2px; }
+
+/* ── Scrub bar: the whole notebook, end to end ───────────────────────── */
+.scrubbar {
+  flex: none;
+  height: var(--scrub-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  z-index: 25;
+}
+
+.scrub-end {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  min-width: 2.5ch;
+  text-align: center;
+}
+
+.scrub-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 18px;
+}
+
+/* The line itself, with the read-so-far portion filled. */
+.scrub-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.scrub-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--acc);
+}
+
+/* Bookmark markers sit above the line at their page's position. */
+.scrub-marks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  height: 30px;
+  z-index: 2;               /* markers stay clickable over the slider */
+  pointer-events: none;
+}
+
+.mark {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* A rounded head on a short stem, pointing down at the line. */
+.mark-head {
+  width: 15px;
+  height: 15px;
+  border-radius: 5px 5px 3px 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  transition: transform .12s, box-shadow .12s;
+}
+
+.mark-stem {
+  width: 2px;
+  height: 9px;
+  border-radius: 0 0 1px 1px;
+  opacity: .75;
+}
+
+.mark:hover .mark-head { transform: translateY(-4px) scale(1.15); }
+
+/* Your own bookmarks read as outlined, the author's as solid. */
+.mark.mine .mark-head {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3), inset 0 0 0 2px var(--panel);
+}
+
+/* The bookmark for the page you are on. */
+.mark.here .mark-head {
+  transform: translateY(-3px) scale(1.2);
+  box-shadow: 0 0 0 2px var(--ink), 0 1px 3px rgba(0, 0, 0, .3);
+}
+
+/* The range input covers the whole track so anywhere is draggable. */
+#pageSlider {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+#pageSlider::-webkit-slider-runnable-track { height: 26px; background: none; }
+#pageSlider::-moz-range-track { height: 26px; background: none; }
+
+#pageSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--acc);
+  border: 3px solid var(--panel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+}
+
+#pageSlider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--acc);
+  border: 3px solid var(--panel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+}
+
+#pageSlider:focus-visible { outline: none; }
+#pageSlider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--focus); }
+
+/* Zoomed, the stage scrolls; anything pinned to its edges must go fixed. */
+.stage.zoomed .zoomer { position: fixed; bottom: calc(var(--scrub-h) + 12px); }
+.stage.zoomed .edge-nav { position: fixed; top: calc(50% + var(--topbar-h) / 2); }
+
+/* Hint shown while a drawing tool is on */
+.tool-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 38px;
+  transform: translateX(-50%);
+  z-index: 15;
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--acc-ink);
+  background: var(--acc);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Empty state */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 34px;
+  text-align: center;
+  border: 2px dashed var(--line);
+  border-radius: 18px;
+  transition: border-color .15s, background .15s;
+}
+
+.drop-zone.over { border-color: var(--acc); background: var(--panel); }
+
+.drop-arrow {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  color: var(--acc-ink);
+  background: var(--acc);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.drop-arrow svg { width: 30px; height: 30px; stroke-width: 2; }
+.drop-title { margin: 6px 0 0; font-size: 17px; font-weight: 600; }
+.drop-sub { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+
+code {
+  padding: 1px 5px;
+  font-family: ui-monospace, "IBM Plex Mono", monospace;
+  font-size: .92em;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+/* Colour swatches */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 4px;
+}
+
+.swatch {
+  /* flex: none matters — inside the narrow rail these would otherwise be
+     squeezed horizontally into ovals while keeping their full height. */
+  flex: none;
+  width: 22px;
+  height: 22px;
+  aspect-ratio: 1;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--line);
+  transition: transform .1s;
+}
+
+.swatch:hover { transform: scale(1.12); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+
+/* ── Side panels ─────────────────────────────────────────────────────── */
+.panel {
+  /* Both panels open from the left rail, so they sit just clear of it rather
+     than on top of it. The workspace box starts at the rail's outer edge. */
+  position: absolute;
+  left: calc(var(--rail-w) + 12px);
+  top: 12px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - var(--rail-w) * 2 - 24px));
+  max-height: calc(100% - 24px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.panel-close {
+  width: 30px;
+  height: 30px;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.panel-close:hover { background: var(--panel-2); color: var(--ink); }
+
+.panel-body {
+  padding: 6px 10px 14px;
+  overflow-y: auto;
+}
+
+.sec-head {
+  margin: 12px 6px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.sec-note { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: .85; }
+
+.sec-empty {
+  margin: 2px 6px 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.list { display: flex; flex-direction: column; gap: 2px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.row:hover { background: var(--panel-2); }
+
+.row-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-page {
+  font-size: 12px;
+  color: var(--ink-3);
+  flex: none;
+}
+
+.row-act {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: none;
+}
+
+.row-act:hover { background: var(--line-soft); color: var(--ink); }
+.row-act svg { width: 14px; height: 14px; }
+
+.panel-body input[type="search"],
+.pop input[type="text"] {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  margin: 4px 0 8px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.panel-body input[type="search"]:focus,
+.pop input[type="text"]:focus { outline: none; border-color: var(--focus); }
+
+.hit-text {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hit-text mark {
+  background: var(--acc);
+  color: var(--acc-ink);
+  border-radius: 2px;
+}
+
+/* ── All-pages grid ──────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.overlay-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* A full-screen overlay needs a way out you cannot miss, so this one is a
+   labelled button rather than a bare glyph in the corner. */
+.overlay-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px 0 13px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background .12s, border-color .12s, color .12s;
+}
+
+.overlay-close svg { width: 18px; height: 18px; stroke-width: 2.2; }
+.overlay-close:hover { background: var(--acc); color: var(--acc-ink); border-color: var(--acc); }
+
+.overlay-head h2 {
+  margin: 0;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 19px;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────
+   The stock bar is a heavy grey slab against these light panels. This is the
+   same slim rounded thumb everywhere: transparent border plus background-clip
+   insets it, so it reads as floating rather than filling a gutter. */
+.grid,
+.panel-body,
+.modal {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.grid::-webkit-scrollbar,
+.panel-body::-webkit-scrollbar,
+.modal::-webkit-scrollbar { width: 12px; height: 12px; }
+
+.grid::-webkit-scrollbar-track,
+.panel-body::-webkit-scrollbar-track,
+.modal::-webkit-scrollbar-track { background: transparent; }
+
+.grid::-webkit-scrollbar-thumb,
+.panel-body::-webkit-scrollbar-thumb,
+.modal::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 4px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+.grid::-webkit-scrollbar-thumb:hover,
+.panel-body::-webkit-scrollbar-thumb:hover,
+.modal::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: content-box;
+}
+
+.grid::-webkit-scrollbar-corner,
+.panel-body::-webkit-scrollbar-corner,
+.modal::-webkit-scrollbar-corner { background: transparent; }
+
+.grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 16px;
+  padding: 18px;
+  align-content: start;
+}
+
+.thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.thumb-img {
+  width: 100%;
+  aspect-ratio: 17 / 22;
+  object-fit: cover;
+  object-position: top center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .12s, border-color .12s;
+}
+
+/* A page that hasn't been rendered yet shows a moving sheen, so an
+   only-part-filled grid reads as still working rather than broken. */
+.thumb-img:not([src]) {
+  /* The gradient is transparent at both ends, so the tiled pattern is
+     periodic and travelling exactly one tile width loops with no seam. */
+  background-image: linear-gradient(100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--ink-3) 24%, transparent) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: repeat;
+  animation: thumb-wait 1.6s linear infinite;
+}
+
+@keyframes thumb-wait {
+  from { background-position: 0 0; }
+  to { background-position: -200% 0; }
+}
+
+.thumb:hover .thumb-img { transform: translateY(-3px); border-color: var(--acc); }
+.thumb-cap { font-size: 12px; color: var(--ink-2); text-align: center; }
+.thumb.current .thumb-img { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc); }
+
+/* ── Popover ─────────────────────────────────────────────────────────── */
+.pop {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--scrub-h) + 10px);
+  z-index: 45;
+  width: 268px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.pop-head {
+  margin: 0 0 8px;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pop-lbl {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.pop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.primary, .ghost {
+  height: 38px;
+  padding: 0 15px;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.primary {
+  color: var(--acc-ink);
+  background: var(--acc);
+  border: 1px solid rgba(0, 0, 0, .12);
+}
+
+.pop-actions .primary { flex: 1; }
+
+.primary:hover { filter: brightness(1.06); }
+
+.ghost {
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--line);
+}
+
+.ghost:hover { background: var(--panel-2); color: var(--ink); }
+.primary.big { width: 100%; height: 46px; font-size: 15.5px; margin-top: 18px; }
+
+/* ── Modals ──────────────────────────────────────────────────────────── */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(12, 15, 20, .55);
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 71;
+  width: min(620px, calc(100vw - 28px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 26px 28px 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.modal .panel-close { position: absolute; top: 14px; right: 14px; }
+
+.modal-title {
+  margin: 0 0 6px;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  padding-right: 30px;
+}
+
+.modal-lead { margin: 0 0 16px; color: var(--ink-2); }
+
+.tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tips li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.tip-ic {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--acc-ink);
+  background: var(--acc);
+  border-radius: 50%;
+}
+
+.help-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px 22px;
+  margin: 14px 0 4px;
+}
+
+.help-grid b { font-size: 14.5px; }
+.help-grid p { margin: 3px 0 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 2px 6px;
+  margin-right: 3px;
+  font: 600 11.5px/1.4 ui-monospace, monospace;
+  text-align: center;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.author-box {
+  margin-top: 20px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+.author-box summary {
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.author-box p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+.author-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.author-actions .primary { flex: 0 0 auto; }
+
+/* ── Small screens ───────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  :root { --topbar-h: 56px; --rail-w: 64px; --scrub-h: 70px; }
+  .brand { flex: 0 1 auto; overflow: hidden; }
+  .brand .titles { display: none; }
+  .pager { flex: 1 1 auto; justify-content: center; min-width: 0; }
+  .tbtn-label { display: none; }
+  .tbtn { padding: 0 10px; }
+  .rbtn { font-size: 9.5px; padding: 7px 2px; }
+  .rbtn svg { width: 18px; height: 18px; }
+  .load-chip { bottom: auto; top: 12px; }
+  .stage.zoomed .load-chip { position: fixed; top: calc(var(--topbar-h) + 12px); bottom: auto; }
+}
+
+@media (max-width: 620px) {
+  /* Too narrow for two rails plus a readable page: the rails become icon
+     strips and the labels drop away. */
+  :root { --rail-w: 46px; }
+  .rbtn span, .rail-label { display: none; }
+  .rbtn { padding: 9px 2px; }
+  .rail { padding: 8px 4px; }
+  .rail .swatches { gap: 4px; }
+  .badge, #btnFullscreen { display: none; }
+  .pbtn { padding: 0 12px; }
+  .pbtn span { display: none; }
+  .scrubbar { padding: 0 10px; gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

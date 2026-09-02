@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "bookmarks": [
+    { "label": "Contents", "page": 4, "color": "#FFD84D" },
+    { "label": "Judge's guide", "page": 7, "color": "#FF6B5E" },
+    { "label": "Introduction", "page": 12, "color": "#3EC79C" },
+    { "label": "Rules & strategy", "page": 30, "color": "#54A8F0" },
+    { "label": "Meeting logs", "page": 40, "color": "#FFD84D" },
+    { "label": "Gen 1 robot", "page": 55, "color": "#FF6B5E" },
+    { "label": "Gen 2 robot", "page": 164, "color": "#3EC79C" },
+    { "label": "Appendix", "page": 238, "color": "#54A8F0" }
+  ]
+}
