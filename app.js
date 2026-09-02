@@ -24,6 +24,7 @@
     pageInput: $("pageInput"), pageTotal: $("pageTotal"),
     pageSlider: $("pageSlider"),
     loadChip: $("loadChip"),
+    bootCard: $("bootCard"), bootFill: $("bootFill"), bootSub: $("bootSub"),
     contentsPanel: $("contentsPanel"), authorList: $("authorList"),
     authorEmpty: $("authorEmpty"), mineList: $("mineList"), mineEmpty: $("mineEmpty"),
     searchPanel: $("searchPanel"), searchInput: $("searchInput"),
@@ -194,15 +195,68 @@
     // inside openPdf must reach the console instead of being hidden by it.
     let data;
     try {
-      const res = await fetch(cfg.pdf || "notebook.pdf", { cache: "no-cache" });
-      if (!res.ok) throw new Error(String(res.status));
-      data = await res.arrayBuffer();
+      data = await fetchPdf(cfg.pdf || "notebook.pdf");
     } catch (err) {
       console.warn("notebook.pdf could not be fetched:", err);
+      els.bootCard.hidden = true;
       els.dropCard.hidden = false;
       return;
     }
     await openPdf(data);
+  }
+
+  const MB = (n) => (n / 1048576).toFixed(1);
+
+  // Read the PDF as a stream rather than one arrayBuffer() call, so the
+  // splash can report real progress instead of sitting still for the whole
+  // download. Falls back to a plain read where streaming is unavailable.
+  async function fetchPdf(url) {
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) throw new Error(String(res.status));
+
+    const total = Number(res.headers.get("content-length")) || 0;
+    if (!res.body || !res.body.getReader) {
+      els.bootFill.classList.add("unknown");
+      els.bootSub.textContent = "Downloading…";
+      return res.arrayBuffer();
+    }
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let got = 0, painted = 0;
+
+    // A chunked or compressed response has no length to measure against.
+    if (!total) {
+      els.bootFill.classList.add("unknown");
+      els.bootSub.textContent = "Downloading…";
+    }
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      got += value.length;
+
+      // Repainting on every chunk would cost more than it shows.
+      if (got - painted > 262144 || got === total) {
+        painted = got;
+        if (total) {
+          els.bootFill.style.width = `${Math.round((got / total) * 100)}%`;
+          els.bootSub.textContent = `${MB(got)} of ${MB(total)} MB`;
+        } else {
+          els.bootSub.textContent = `${MB(got)} MB`;
+        }
+      }
+    }
+
+    const out = new Uint8Array(got);
+    let at = 0;
+    for (const c of chunks) { out.set(c, at); at += c.length; }
+
+    els.bootFill.classList.remove("unknown");
+    els.bootFill.style.width = "100%";
+    els.bootSub.textContent = "Preparing the pages…";
+    return out;
   }
 
   els.fileInput.addEventListener("change", () => {
@@ -244,6 +298,7 @@
     buildBookmarkColors();
 
     els.zoomPad.hidden = false;
+    els.bootCard.hidden = true;
     els.zoomer.hidden = els.scrubBar.hidden = false;
     syncHistoryButtons();
     els.scrubLast.textContent = String(state.pageCount);

@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Engineering Notebook</title>
 <meta name="description" content="Read our engineering notebook as a flip book — with highlighting, notes and bookmarks.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23FFD84D' d='M6 2h12v20l-6-4.5L6 22z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=48">
+<link rel="stylesheet" href="styles.css?v=49">
 </head>
 <body>
 
@@ -81,6 +82,16 @@
   </nav>
 
   <main class="stage" id="stage">
+
+    <!-- Covers the stage until the PDF has arrived. Without it the book area
+         is simply blank for the length of a 50 MB download. -->
+    <div class="boot" id="bootCard">
+      <p class="boot-title">Opening the notebook…</p>
+      <div class="boot-track"><div class="boot-fill" id="bootFill"></div></div>
+      <p class="boot-sub" id="bootSub">Starting…</p>
+      <p class="boot-note">It is a big file, so the first visit takes a moment.
+        After that your browser keeps a copy and it opens straight away.</p>
+    </div>
 
     <!-- Shown only if notebook.pdf is missing -->
     <div class="drop-zone" id="dropCard" hidden>
@@ -278,7 +289,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="config.js?v=48"></script>
-<script src="app.js?v=48"></script>
+<script src="config.js?v=49"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>

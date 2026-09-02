@@ -1,0 +1,6 @@
+# Keep this notebook out of search engines.
+# The <meta name="robots" content="noindex"> tag in index.html is what
+# actually removes it from results; this file stops well-behaved crawlers
+# fetching the 50 MB PDF in the first place.
+User-agent: *
+Disallow: /
