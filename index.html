@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=66">
+<link rel="stylesheet" href="styles.css?v=67">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   </div>
 
   <div class="pager">
-    <button class="pbtn" id="btnPrev" data-peek="tip" data-tip="Previous page" data-tip-hint="Or press the left arrow key">
+    <button class="pbtn" id="btnPrev" aria-label="Previous page" data-peek="tip" data-tip="Previous page" data-tip-hint="Or press the left arrow key">
       <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
       <span>Prev</span>
     </button>
@@ -32,7 +32,7 @@
       <input type="number" id="pageInput" min="1" value="1" aria-label="Page number — type a page and press Enter">
       <span class="page-total" id="pageTotal">of —</span>
     </div>
-    <button class="pbtn" id="btnNext" data-peek="tip" data-tip="Next page" data-tip-hint="Or press the right arrow key">
+    <button class="pbtn" id="btnNext" aria-label="Next page" data-peek="tip" data-tip="Next page" data-tip-hint="Or press the right arrow key">
       <span>Next</span>
       <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
     </button>
@@ -288,7 +288,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="config.js?v=66"></script>
-<script src="app.js?v=66"></script>
+<script src="config.js?v=67"></script>
+<script src="app.js?v=67"></script>
 </body>
 </html>

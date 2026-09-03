@@ -502,6 +502,30 @@
       showPageCorners: true,
     });
     state.pf.loadFromHTML(document.querySelectorAll(".page"));
+
+    // Turning back was dead on a phone. flipPrev() and flipNext() both work by
+    // inventing a point on the page and handing it to the same code a click
+    // goes through, which — with disableFlipByClick on — first checks that the
+    // point is at a corner. flipNext() offsets its point by the book's own
+    // origin; flipPrev() writes a bare x: 10 and forgets to.
+    //
+    // On a two-page spread that oversight is invisible, because the book's
+    // origin happens to be 0 there: the library derives it as
+    // blockWidth / 2 - pageWidth, and a page is half the block. On one page a
+    // page IS the block, so the origin is -blockWidth / 2, and x: 10 lands
+    // near the middle of the page instead of its edge. No corner, no turn, no
+    // complaint — which is why the Prev button, the left arrow, the wheel and
+    // the swipe back all did nothing, and only ever on a narrow screen.
+    //
+    // Add the offset it forgot. On a spread the origin is 0, so this is
+    // exactly what the library already computed.
+    state.pf.flipPrev = (corner) => {
+      const r = state.pf.getRender().getRect();
+      state.pf.getFlipController().flip({
+        x: r.left + 10,
+        y: corner === "bottom" ? r.height - 2 : 1,
+      });
+    };
     if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
