@@ -399,10 +399,11 @@ body.drawing .pan-catch { display: none !important; }
   height: 100%;
   object-fit: fill;
   user-select: none;
-  /* A page normally has its picture ready before it is looked at, and .ready
-     is set in the same frame as the src — so this fade only ever runs for a
-     page the reader jumped to faster than it could load, where it eases the
-     thumbnail backdrop into focus instead of snapping. */
+  /* Two of these are stacked per page. A replacement loads into the hidden
+     one and dissolves up over the one on screen, so a change of size is never
+     a cut. The very first picture a page gets skips the fade — there is
+     nothing behind it but the soft backdrop. Duration is mirrored by FADE_MS
+     in app.js; change both together. */
   opacity: 0;
   transition: opacity .22s ease;
 }
@@ -855,8 +856,17 @@ body.drawing .page-inner { cursor: crosshair; }
 #pageSlider:focus-visible { outline: none; }
 #pageSlider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--focus); }
 
-/* Zoomed, the stage scrolls; anything pinned to its edges must go fixed. */
-.stage.zoomed .zoomer { position: fixed; bottom: calc(var(--scrub-h) + 12px); }
+/* Zoomed, the stage scrolls, so a control pinned to its edge has to leave it
+   and pin to the viewport instead — otherwise it slides away with the page.
+   The viewport is wider than the stage by one rail on each side and taller by
+   the topbar and the scrub bar, so the offsets have to put that back. Without
+   it the control lands on top of the right-hand rail. Matching the resting
+   offsets exactly means the control does not move when the reader zooms. */
+.stage.zoomed .zoomer {
+  position: fixed;
+  right: calc(var(--rail-w) + 14px);
+  bottom: calc(var(--scrub-h) + 16px);
+}
 .stage.zoomed .edge-nav { position: fixed; top: calc(50% + var(--topbar-h) / 2); }
 
 /* Hint shown while a drawing tool is on */

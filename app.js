@@ -260,6 +260,7 @@
      pull tens of megabytes for pages nobody opens; the browser keeps the
      ones it has fetched, so turning back is instant. */
 
+  const FADE_MS = 220;   // must match .page-img's transition in styles.css
   const ATTACH = 4;   // pages carrying an image at all
   const DECODE = 5;   // pages whose picture is turned into a bitmap in advance
   const WARM = 8;     // pages pulled into the browser cache ahead of the reader
@@ -306,7 +307,7 @@
     const backdrop = new Image();
     backdrop.onload = () => {
       if (!rec.level) return;
-      rec.el.querySelector(".page-inner").style.backgroundImage = `url("${thumbUrl(i)}")`;
+      rec.inner.style.backgroundImage = `url("${thumbUrl(i)}")`;
       if (rec.loading) rec.loading.hidden = true;
     };
     backdrop.src = thumbUrl(i);
@@ -315,21 +316,57 @@
     if (!rec.linked) { rec.linked = true; placeLinks(i, rec.linkLayer); }
   }
 
+  // Put a size on screen. Anything already showing is dissolved out rather
+  // than replaced under the reader, which is what stops a change of size from
+  // reading as a flash.
   function setLevel(rec, i, level) {
     if (rec.level === level) return;
-    const first = !rec.level;
     rec.level = level;
-    // On a change of size the element keeps painting the picture it already
-    // has until the new one is ready, so an upgrade is never a blank frame.
-    rec.img.src = level === "zoom" ? pageUrl(i) : readUrl(i);
-    if (!first) return;
 
-    if (rec.img.complete && rec.img.naturalWidth) {
-      rec.img.classList.add("ready");        // same frame: no fade at all
-    } else {
-      const show = () => rec.img.classList.add("ready");
-      rec.img.addEventListener("load", show, { once: true });
-      rec.img.addEventListener("error", show, { once: true });
+    const front = rec.imgs[rec.front];
+    const back = rec.imgs[1 - rec.front];
+    const seq = ++rec.seq;
+    if (rec.fade) { clearTimeout(rec.fade); rec.fade = 0; }
+
+    // Park the incoming layer at invisible without animating it there. It is
+    // behind the outgoing one and nobody can see it, and a fade-out here
+    // would be the state the fade-in has to start from.
+    back.style.transition = "none";
+    back.classList.remove("ready");
+    back.src = level === "zoom" ? pageUrl(i) : readUrl(i);
+    front.after(back);                  // incoming layer paints over outgoing
+    void back.offsetWidth;              // settle it before the transition
+    back.style.transition = "";
+
+    const arrived = back.complete && back.naturalWidth;
+    // Nothing is on screen to dissolve from on the first image a page gets —
+    // and the only thing under it is the soft backdrop, which is better cut
+    // away instantly than faded through.
+    if (arrived && !front.getAttribute("src")) {
+      back.style.transition = "none";
+      back.classList.add("ready");
+      void back.offsetWidth;
+      back.style.transition = "";
+      rec.front = 1 - rec.front;
+      return;
+    }
+
+    const reveal = () => {
+      if (rec.seq !== seq) return;      // superseded while this one loaded
+      back.classList.add("ready");
+      rec.front = 1 - rec.front;
+      // Release the outgoing picture once it has finished dissolving away.
+      rec.fade = setTimeout(() => {
+        rec.fade = 0;
+        front.classList.remove("ready");
+        front.removeAttribute("src");
+      }, FADE_MS + 80);
+    };
+
+    if (arrived) reveal();
+    else {
+      back.addEventListener("load", reveal, { once: true });
+      back.addEventListener("error", reveal, { once: true });
     }
   }
 
@@ -342,9 +379,11 @@
         attach(rec, i);
       } else if (rec.level) {
         rec.level = null;
-        rec.img.classList.remove("ready");
-        rec.img.removeAttribute("src");
-        rec.el.querySelector(".page-inner").style.backgroundImage = "";
+        rec.seq++;
+        if (rec.fade) { clearTimeout(rec.fade); rec.fade = 0; }
+        for (const im of rec.imgs) { im.classList.remove("ready"); im.removeAttribute("src"); }
+        rec.front = 0;
+        rec.inner.style.backgroundImage = "";
         if (rec.loading) rec.loading.hidden = false;
       }
     }
@@ -407,11 +446,22 @@
       loading.className = "page-loading";
       loading.textContent = String(i + 1);
 
-      const img = document.createElement("img");
-      img.className = "page-img";
-      img.alt = `Page ${i + 1}`;
-      img.draggable = false;
-      img.decoding = "async";
+      // Two image layers per page. A page never swaps the picture inside one
+      // element — the replacement loads into the spare layer and fades up over
+      // the one already on screen, so changing size is a dissolve and not a
+      // snap. Which layer is in front alternates; stacking is by document
+      // order, so the links and annotations above them stay above them.
+      const imgs = [0, 1].map(() => {
+        const im = document.createElement("img");
+        im.className = "page-img";
+        im.alt = `Page ${i + 1}`;
+        im.draggable = false;
+        im.decoding = "async";
+        // The placeholder sits behind the images and goes as soon as one of
+        // them lands, so a page being fetched shows its number, not a gap.
+        im.addEventListener("load", () => { if (loading) loading.hidden = true; });
+        return im;
+      });
 
       const linkLayer = document.createElement("div");
       linkLayer.className = "link-layer";
@@ -422,13 +472,11 @@
       anno.height = 0;  // pages cost nothing during flips
       wireDrawing(anno, i);
 
-      inner.append(loading, img, linkLayer, anno);
+      inner.append(loading, imgs[0], imgs[1], linkLayer, anno);
       el.appendChild(inner);
       els.book.appendChild(el);
-      // The placeholder sits behind the image and is hidden once it decodes,
-      // so a page being fetched shows its number rather than a white gap.
-      img.addEventListener("load", () => { if (loading) loading.hidden = true; });
-      state.pages.push({ el, img, loading, anno, ctx: anno.getContext("2d"), linkLayer,
+      state.pages.push({ el, inner, imgs, front: 0, seq: 0, fade: 0,
+        loading, anno, ctx: anno.getContext("2d"), linkLayer,
         level: null, linked: false });
       redraw(i);
     }
