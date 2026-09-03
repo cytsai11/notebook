@@ -14,7 +14,9 @@ it is five plain files you can host anywhere for free.
 | `app.js` | How it works. |
 | `config.js` | **The only file you edit by hand** — team name, title, colours. |
 | `bookmarks.json` | Your bookmarks. The site writes this for you (see below). |
-| `notebook.pdf` | Your notebook. Replace this file to publish a new version. |
+| `notebook.pdf` | Your notebook — the source the page images are built from. |
+| `pages/` | The built page images. Created by the build step; do not edit by hand. |
+| `tools/` | The build script that turns the PDF into those images. |
 | `Open notebook.bat` | Double-click this to read the notebook on this computer. |
 
 ## Looking at it on your own computer
@@ -40,20 +42,33 @@ to install if it is missing. If you would rather run it yourself:
 python -m http.server 8765
 ```
 
-## Putting it online for free — GitHub Pages
+## Publishing a new version
 
-1. Make a free GitHub account and create a new **public** repository.
-2. Upload everything in this folder (drag the files onto the upload page).
-3. In the repository go to **Settings → Pages**, set **Source** to the `main`
-   branch and the root folder, and press Save.
-4. A minute later your notebook is live at
-   `https://<your-username>.github.io/<repository-name>/`
+1. Replace `notebook.pdf` with your new export.
+2. Rebuild the page images:
 
-That link is what you give judges — put it on a QR code at your pit.
+   ```
+   cd tools
+   npm install      # first time only
+   npm run build
+   ```
 
-GitHub's file limit is 100 MB, which this notebook is under. If a future
-export goes over, compress the PDF first (Adobe's "Compress PDF", Smallpdf,
-or Ghostscript).
+3. Publish:
+
+   ```
+   git add -A && git commit -m "Update notebook" && git push
+   ```
+
+GitHub Pages rebuilds in about a minute.
+
+## Why page images instead of the PDF
+
+The site used to download the whole 50 MB PDF and draw it in the reader's
+browser, so nothing appeared until the last byte arrived — painful on
+competition Wi-Fi. `tools/build-pages.mjs` now turns the PDF into one WebP per
+page, so a reader fetches only the pages they actually open. Search text and
+every hyperlink are extracted at build time too, so both still work.
+
 
 ## Updating the notebook
 

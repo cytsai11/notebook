@@ -20,10 +20,9 @@
     stage: $("stage"), zoomPad: $("zoomPad"), bookWrap: $("bookWrap"),
     book: $("book"), scrubBar: $("scrubBar"), scrubMarks: $("scrubMarks"),
     scrubFill: $("scrubFill"), scrubLast: $("scrubLast"),
-    dropCard: $("dropCard"), fileInput: $("fileInput"),
+    dropCard: $("dropCard"),
     pageInput: $("pageInput"), pageTotal: $("pageTotal"),
     pageSlider: $("pageSlider"),
-    loadChip: $("loadChip"),
     bootCard: $("bootCard"), bootFill: $("bootFill"), bootSub: $("bootSub"),
     contentsPanel: $("contentsPanel"), authorList: $("authorList"),
     authorEmpty: $("authorEmpty"), mineList: $("mineList"), mineEmpty: $("mineEmpty"),
@@ -44,9 +43,6 @@
   $("nbSeason").textContent = cfg.season || "";
   document.title = cfg.title || "Engineering Notebook";
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const FLIP_MS = reducedMotion ? 120 : 480;   // page-turn duration
   const ANNO_W = 1100;                       // annotation canvas width, px
@@ -61,22 +57,24 @@
 
   const LS = {
     theme: "nb:theme", seen: "nb:seen", author: "nb:authormode", draft: "nb:authordraft",
-    marks: (fp) => `nb:marks:${fp}`, mine: (fp) => `nb:mine:${fp}`,
+    // Keyed by page count so a reader's marks survive a rebuild of the same
+    // notebook, but do not land on the wrong pages after a re-paginated one.
+    marks: (n) => `nb:marks:${n}`, mine: (n) => `nb:mine:${n}`, last: (n) => `nb:last:${n}`,
   };
 
   const state = {
-    pdf: null, fp: "", pageCount: 0, ratio: 0.773,
-    pf: null, pages: [], text: {},
+    pageCount: 0, ratio: 0.773,
+    pf: null, pages: [],
     tool: null,
     ink: { p: INKS.p[0].c, h: INKS.h[0].c },
-    marks: {}, undo: [], redo: [],
+    marks: {}, undo: [], redo: [], text: [],
     mine: [],                     // personal bookmarks {page,label,color}
     author: [],                   // author bookmarks  {page,label,color}
     authorFile: [],               // what bookmarks.json actually holds
     authorMode: false,
     zoom: 1, fitW: 0, fitH: 0,
-    renderQueue: new Set(), rendering: false, renderedCount: 0, busy: false, busyUntil: 0,
-    panning: false, hiTask: null, urgent: new Set(), coverTurn: false, pendingIdx: null,
+    busy: false, busyUntil: 0,
+    panning: false, coverTurn: false, pendingIdx: null, links: [],
     bmColor: PALETTE[0],
   };
 
@@ -169,8 +167,8 @@
   $("btnResetMine").addEventListener("click", () => {
     if (!confirm("Erase every mark and personal bookmark you have made in this browser?")) return;
     try {
-      localStorage.removeItem(LS.marks(state.fp));
-      localStorage.removeItem(LS.mine(state.fp));
+      localStorage.removeItem(LS.marks(state.pageCount));
+      localStorage.removeItem(LS.mine(state.pageCount));
     } catch { /* ignore */ }
     state.marks = {};
     state.mine = [];
@@ -182,7 +180,13 @@
     closeModal();
   });
 
-  /* ══ PDF loading ═══════════════════════════════════════════════════════ */
+  /* ══ Loading ═══════════════════════════════════════════════════════════
+     The notebook ships as per-page WebP images built by tools/build-pages.mjs,
+     not as a PDF the browser has to rasterise. Startup is therefore just a
+     small manifest, and each page image is fetched only when it is needed. */
+
+  const pageUrl = (i) => `pages/p/${String(i + 1).padStart(4, "0")}.webp`;
+  const thumbUrl = (i) => `pages/t/${String(i + 1).padStart(4, "0")}.webp`;
 
   async function boot() {
     await loadAuthorBookmarks();
@@ -191,107 +195,35 @@
       if (localStorage.getItem(LS.author) === "1") setAuthorMode(true);
     } catch { /* ignore */ }
 
-    // Only a genuine "can't get the file" falls back to the drop zone; a bug
-    // inside openPdf must reach the console instead of being hidden by it.
-    let data;
+    let manifest;
     try {
-      data = await fetchPdf(cfg.pdf || "notebook.pdf");
+      const res = await fetch("pages/index.json", { cache: "no-cache" });
+      if (!res.ok) throw new Error(String(res.status));
+      manifest = await res.json();
+      if (!manifest || !manifest.count) throw new Error("empty manifest");
     } catch (err) {
-      console.warn("notebook.pdf could not be fetched:", err);
+      console.warn("pages/index.json could not be read:", err);
       els.bootCard.hidden = true;
       els.dropCard.hidden = false;
       return;
     }
-    await openPdf(data);
+    open(manifest);
   }
 
-  const MB = (n) => (n / 1048576).toFixed(1);
-
-  // Read the PDF as a stream rather than one arrayBuffer() call, so the
-  // splash can report real progress instead of sitting still for the whole
-  // download. Falls back to a plain read where streaming is unavailable.
-  async function fetchPdf(url) {
-    const res = await fetch(url, { cache: "no-cache" });
-    if (!res.ok) throw new Error(String(res.status));
-
-    const total = Number(res.headers.get("content-length")) || 0;
-    if (!res.body || !res.body.getReader) {
-      els.bootFill.classList.add("unknown");
-      els.bootSub.textContent = "Downloading…";
-      return res.arrayBuffer();
-    }
-
-    const reader = res.body.getReader();
-    const chunks = [];
-    let got = 0, painted = 0;
-
-    // A chunked or compressed response has no length to measure against.
-    if (!total) {
-      els.bootFill.classList.add("unknown");
-      els.bootSub.textContent = "Downloading…";
-    }
-
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      got += value.length;
-
-      // Repainting on every chunk would cost more than it shows.
-      if (got - painted > 262144 || got === total) {
-        painted = got;
-        if (total) {
-          els.bootFill.style.width = `${Math.round((got / total) * 100)}%`;
-          els.bootSub.textContent = `${MB(got)} of ${MB(total)} MB`;
-        } else {
-          els.bootSub.textContent = `${MB(got)} MB`;
-        }
-      }
-    }
-
-    const out = new Uint8Array(got);
-    let at = 0;
-    for (const c of chunks) { out.set(c, at); at += c.length; }
-
-    els.bootFill.classList.remove("unknown");
-    els.bootFill.style.width = "100%";
-    els.bootSub.textContent = "Preparing the pages…";
-    return out;
-  }
-
-  els.fileInput.addEventListener("change", () => {
-    const f = els.fileInput.files[0];
-    if (f) f.arrayBuffer().then(openPdf);
-  });
-  $("dropBtn").addEventListener("click", () => els.fileInput.click());
-  window.addEventListener("dragover", (e) => { e.preventDefault(); els.dropCard.classList.add("over"); });
-  window.addEventListener("dragleave", () => els.dropCard.classList.remove("over"));
-  window.addEventListener("drop", (e) => {
-    e.preventDefault();
-    els.dropCard.classList.remove("over");
-    const f = e.dataTransfer.files[0];
-    if (f && f.type === "application/pdf") f.arrayBuffer().then(openPdf);
-  });
-
-  async function openPdf(data) {
+  function open(manifest) {
     els.dropCard.hidden = true;
-    const doc = await pdfjsLib.getDocument({
-      data,
-      cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
-      cMapPacked: true,
-    }).promise;
-
-    state.pdf = doc;
-    state.fp = (doc.fingerprints && doc.fingerprints[0]) || doc.fingerprint || "doc";
-    state.pageCount = doc.numPages;
-
-    const p1 = await doc.getPage(1);
-    const vp = p1.getViewport({ scale: 1 });
-    state.ratio = vp.width / vp.height;
+    state.pageCount = manifest.count;
+    state.ratio = manifest.ratio || 0.773;
+    state.links = manifest.links || [];
 
     loadPersonal();
     buildPages();
-    initFlip();
+
+    // Where to open: an explicit link wins, otherwise carry on where this
+    // reader stopped. Decided before the flip engine is built so it can start
+    // there outright rather than turning once it is running.
+    const start = pageFromHash();
+    initFlip(start !== null ? start : lastPageRead());
     buildTabs();
     buildContents();
     buildInkSwatches();
@@ -313,12 +245,51 @@
     els.pageTotal.textContent = `of ${state.pageCount}`;
     els.pageInput.max = state.pageCount;
     els.pageSlider.max = state.pageCount;
-    els.loadChip.hidden = false;
 
-    for (let i = 0; i < state.pageCount; i++) state.renderQueue.add(i);
-    pumpRender();
-
+    syncUI(current());
+    showNear();
+    loadSearchText();
     firstRunWelcome();
+  }
+
+  /* ══ Which page images are attached ════════════════════════════════════
+     Only pages near the reader carry their image. Attaching all 242 would
+     pull tens of megabytes for pages nobody opens; the browser keeps the
+     ones it has fetched, so turning back is instant. */
+
+  const KEEP = 6;
+
+  function showNear() {
+    const cur = current();
+    for (let i = 0; i < state.pageCount; i++) {
+      const rec = state.pages[i];
+      if (!rec) continue;
+      const near = Math.abs(i - cur) <= KEEP;
+      if (near && !rec.shown) {
+        rec.shown = true;
+        rec.img.src = pageUrl(i);
+        if (!rec.linked) { rec.linked = true; placeLinks(i, rec.linkLayer); }
+      } else if (!near && rec.shown) {
+        rec.shown = false;
+        rec.img.removeAttribute("src");
+        if (rec.loading) rec.loading.hidden = false;
+      }
+    }
+  }
+
+  // Search needs every page's words, but nothing needs them in the first
+  // moments, so it arrives quietly in the background.
+  async function loadSearchText() {
+    try {
+      const res = await fetch("pages/text.json", { cache: "no-cache" });
+      state.text = await res.json();
+    } catch (err) {
+      state.text = [];
+      console.warn("search text unavailable:", err);
+    }
+    els.searchStatus.textContent = state.text.length
+      ? `Type a word above to search all ${state.pageCount} pages.`
+      : "Search is unavailable — pages/text.json could not be read.";
   }
 
   /* ══ Page DOM ══════════════════════════════════════════════════════════ */
@@ -356,15 +327,18 @@
       inner.append(loading, img, linkLayer, anno);
       el.appendChild(inner);
       els.book.appendChild(el);
+      // The placeholder sits behind the image and is hidden once it decodes,
+      // so a page being fetched shows its number rather than a white gap.
+      img.addEventListener("load", () => { if (loading) loading.hidden = true; });
       state.pages.push({ el, img, loading, anno, ctx: anno.getContext("2d"), linkLayer,
-        rendered: false, src: null, thumb: null, level: null, counted: false });
+        shown: false, linked: false });
       redraw(i);
     }
   }
 
   /* ══ Flip engine + sizing + zoom ═══════════════════════════════════════ */
 
-  function initFlip() {
+  function initFlip(startPage) {
     computeFit();
     const h = 560;
     state.pf = new St.PageFlip(els.book, {
@@ -372,6 +346,7 @@
       height: h,
       size: "stretch",
       minWidth: 200, maxWidth: 1200, minHeight: 260, maxHeight: 1600,
+      startPage,          // set here, not by turning afterwards
       showCover: true,
       maxShadowOpacity: 0.3,
       flippingTime: FLIP_MS,
@@ -380,6 +355,7 @@
       showPageCorners: true,
     });
     state.pf.loadFromHTML(document.querySelectorAll(".page"));
+    if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
     // Rasterising a page blocks the main thread for a beat, which is what
@@ -408,10 +384,9 @@
         stopCoverTrack();
         if (state.pendingIdx !== null) { state.pendingIdx = null; buildTabs(); }
         applyZoom(!tracked);
-        prioritizeRender();
       }
     });
-    syncUI(0);
+    syncUI(current());
   }
 
   // Fit size = the book at zoom 1, sized to the stage.
@@ -617,8 +592,10 @@
   }
 
   // Zoom about a screen point so the thing under the cursor stays put.
+  // The buttons step through ZOOMS; a pinch lands anywhere between them, so
+  // any value in range is allowed and only the rounding is snapped.
   function setZoom(z, anchorX, anchorY) {
-    z = Math.min(ZOOMS[ZOOMS.length - 1], Math.max(ZOOMS[0], z));
+    z = Math.min(ZOOMS[ZOOMS.length - 1], Math.max(ZOOMS[0], Math.round(z * 100) / 100));
     if (z === state.zoom) return;
 
     const r = els.zoomPad.getBoundingClientRect();
@@ -630,7 +607,6 @@
 
     state.zoom = z;
     applyZoom();
-    scheduleUpscale();
     hidePeek();
 
     const r2 = els.zoomPad.getBoundingClientRect();
@@ -639,7 +615,7 @@
   }
 
   const zoomStep = (dir, x, y) => {
-    const i = ZOOMS.indexOf(state.zoom);
+    const i = ZOOMS.indexOf(state.zoom);   // -1 after a pinch
     const next = i >= 0
       ? ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i + dir))]
       : (dir > 0 ? ZOOMS.find((v) => v > state.zoom) : [...ZOOMS].reverse().find((v) => v < state.zoom));
@@ -671,7 +647,6 @@
     hidePeek();
     // A sharpening render in flight would stutter the drag — drop it and
     // start again once the reader settles.
-    if (state.hiTask) { try { state.hiTask.cancel(); } catch { /* already done */ } }
     els.stage.classList.add("grabbing");
   }
 
@@ -705,7 +680,6 @@
     if (pan.forwards && pan.moved < 4) forwardClick(e.clientX, e.clientY);
     pan = null;
     state.panning = false;
-    scheduleUpscale();
   }
 
   panCatch.addEventListener("pointerdown", (e) => {
@@ -773,15 +747,57 @@
 
   const current = () => (state.pf ? state.pf.getCurrentPageIndex() : 0);
 
-  function goTo(idx) {
+  function goTo(idx, instant) {
     if (!state.pf) return;
     idx = Math.max(0, Math.min(state.pageCount - 1, idx));
     hidePeek();
 
     if (idx === current()) return;
-    state.pf.flip(idx);
-    prioritizeRender();
+    // Opening straight onto a deep link should not animate 200 pages past.
+    if (instant && state.pf.turnToPage) {
+      state.pf.turnToPage(idx);
+      // Sync against the page we asked for, not getCurrentPageIndex(): the
+      // library does not update that synchronously, so reading it back here
+      // would report the old page and undo the jump.
+      syncUI(idx);
+    } else {
+      state.pf.flip(idx);
+    }
   }
+
+  /* ══ Deep links and picking up where you left off ═══════════════════════
+     The page lives in the URL, so a link can point at one and the browser's
+     own back button walks the pages you jumped to. */
+
+  function pageFromHash() {
+    const m = /(?:^|[#&])(?:p|page)=(\d+)/i.exec(location.hash || "");
+    if (!m) return null;
+    const n = Number(m[1]);
+    return Number.isFinite(n) && n >= 1 && n <= state.pageCount ? n - 1 : null;
+  }
+
+  function lastPageRead() {
+    try {
+      const n = Number(localStorage.getItem(LS.last(state.pageCount)));
+      return Number.isFinite(n) && n > 0 && n < state.pageCount ? n : 0;
+    } catch { return 0; }
+  }
+
+  let hashOurs = false;
+
+  function rememberPage(idx) {
+    try { localStorage.setItem(LS.last(state.pageCount), String(idx)); } catch { /* ignore */ }
+    const want = `#p=${idx + 1}`;
+    if (location.hash === want) return;
+    hashOurs = true;                     // do not treat our own write as a jump
+    history.replaceState(null, "", want);
+  }
+
+  window.addEventListener("hashchange", () => {
+    if (hashOurs) { hashOurs = false; return; }
+    const want = pageFromHash();
+    if (want !== null) goTo(want, true);
+  });
 
   function syncUI(idx) {
     els.pageInput.value = idx + 1;
@@ -799,217 +815,53 @@
     // tracker; touching it here would fight it for the same frames.
     if (!state.coverTurn) applyZoom(turned);
     syncScrub(idx);
+    rememberPage(idx);
     if (turned) { hidePeek(); buildTabs(); }
 
 
-    ensureNear();
-    trimCache();
-    prioritizeRender();
-    scheduleUpscale();
+    showNear();
   }
 
-  /* ══ Render pipeline — nearest page to the reader first ════════════════ */
+  /* ══ Pinch to zoom ═════════════════════════════════════════════════════
+     Judges read on tablets, where the +/- buttons are not the instinct — two
+     fingers are. The gesture zooms continuously about the point between the
+     fingers, so the page stays under them as it grows. */
 
-  function prioritizeRender() { if (!state.rendering) pumpRender(); }
+  let pinch = null;
 
-  // Release the reading-quality image of any page the reader has left behind,
-  // falling back to its thumbnail so the page still shows something. Without
-  // this, a full pass over 242 pages leaves 242 decoded images resident and
-  // every flip has to fight the resulting memory pressure.
-  function trimCache() {
-    const cur = current();
-    for (let i = 0; i < state.pageCount; i++) {
-      const rec = state.pages[i];
-      if (!rec || !rec.src) continue;
-      if (Math.abs(i - cur) <= KEEP_FULL) continue;
-      const old = rec.src;
-      rec.src = null;
-      rec.level = null;
-      if (rec.thumb) rec.img.src = rec.thumb;
-      else rec.img.removeAttribute("src");
-      setTimeout(() => URL.revokeObjectURL(old), 1000);
-    }
-  }
+  const spread = (t) => Math.hypot(
+    t[0].clientX - t[1].clientX,
+    t[0].clientY - t[1].clientY
+  );
 
-  // Bring the pages around the reader back up to reading quality.
-  function ensureNear() {
-    const cur = current();
-    let queued = false;
-    for (let d = 0; d <= KEEP_FULL; d++) {
-      for (const i of d ? [cur - d, cur + d] : [cur]) {
-        if (i < 0 || i >= state.pageCount) continue;
-        const rec = state.pages[i];
-        if (rec && !rec.src && !state.renderQueue.has(i)) {
-          state.renderQueue.add(i);
-          queued = true;
-        }
-      }
-    }
-    if (queued) prioritizeRender();
-  }
+  els.stage.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 2) return;
+    const t = [e.touches[0], e.touches[1]];
+    pinch = {
+      from: spread(t),
+      zoom: state.zoom,
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    };
+    hidePeek();
+  }, { passive: true });
 
-  const idle = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  async function pumpRender() {
-    if (state.rendering) return;
-    state.rendering = true;
-    while (state.renderQueue.size) {
-      // Never start a page render mid-turn — that is what causes the stutter.
-      while (state.busy && Date.now() < state.busyUntil) await idle(60);
-
-      const cur = current();
-      let best = null, bestD = Infinity;
-
-      // Anything someone is actively waiting to see — a link preview they are
-      // hovering right now — goes before the background sweep.
-      for (const i of state.urgent) {
-        if (state.renderQueue.has(i)) { best = i; break; }
-        state.urgent.delete(i);        // no longer queued; drop the claim
-      }
-
-      if (best === null) {
-        for (const i of state.renderQueue) {
-          const d = Math.abs(i - cur);
-          if (d < bestD) { bestD = d; best = i; }
-        }
-      }
-      state.renderQueue.delete(best);
-      const rec = state.pages[best];
-
-      // Pages near the reader get reading quality; everything else only needs
-      // a thumbnail, which is ~17x fewer pixels and keeps memory flat.
-      // A page someone is waiting on for a link preview only ever needs the
-      // thumbnail, so give it that immediately rather than a slow full render.
-      const near = Math.abs(best - cur) <= KEEP_FULL;
-      const urgent = state.urgent.delete(best);
-      const want = (urgent && !rec.thumb) ? "thumb" : (near ? "full" : "thumb");
-      const have = want === "full" ? !!rec.src : (!!rec.thumb && state.text[best] != null);
-      if (!have) {
-        try {
-          await renderPage(best, want);
-        } catch (err) {
-          rec.fails = (rec.fails || 0) + 1;
-          console.error("render", best, err);
-        }
-      }
-      // An urgent thumbnail doesn't satisfy a nearby page's need for reading
-      // quality, so queue it again — the retry cap stops a failing page looping.
-      if (near && !rec.src && (rec.fails || 0) < 3) state.renderQueue.add(best);
-      if (peekWaitingFor === best) refreshPeek();
-      trimCache();
-
-      if (!rec.counted) {
-        rec.counted = true;
-        state.renderedCount++;
-        const pct = Math.round((state.renderedCount / state.pageCount) * 100);
-        els.loadChip.textContent = `Loading ${pct}%`;
-        if (state.renderedCount === state.pageCount) {
-          els.loadChip.hidden = true;
-          els.searchStatus.textContent =
-            `Type a word above to search all ${state.pageCount} pages.`;
-        }
-      }
-      // Yield a frame's worth of time so the UI can paint. Deliberately a
-      // timer, not requestAnimationFrame: rAF is frozen in a background tab,
-      // which would stop the notebook loading the moment someone switches tab.
-      // Hidden, there is nothing to paint and timers are throttled to roughly
-      // one a second, so skip the yield and keep rasterising back to back.
-      if (!document.hidden) await idle(16);
-    }
-    state.rendering = false;
-  }
-
-  // Three quality levels, picked by how close a page is to the reader:
-  //
-  //   thumb — every page, tiny. Feeds the All-pages grid and the link
-  //           previews, and stands in for a page you jump to until its full
-  //           render lands, so you never see a blank sheet.
-  //   full  — reading quality, only for the pages around the current spread.
-  //   hi    — sharp, only for a page you actually zoom into.
-  //
-  // A page that drifts away from the reader is dropped back to its thumbnail
-  // (see trimCache). Holding all 242 pages at reading quality is what made
-  // flipping get heavier the longer the notebook was left loading.
-  const LEVEL_PX = { thumb: 200, full: 820, hi: 2200 };
-  const KEEP_FULL = 8;                    // pages either side kept at full
-
-  async function renderPage(i, level) {
-    const page = await state.pdf.getPage(i + 1);
-    const base = page.getViewport({ scale: 1 });
-    const hi = level === "hi";
-    const target = LEVEL_PX[level] || LEVEL_PX.full;
-    const scale = Math.min(hi ? 4 : 2, Math.max(0.15, target / base.width));
-    const vp = page.getViewport({ scale });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.floor(vp.width);
-    canvas.height = Math.floor(vp.height);
-    const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // "print" intent keeps rendering going even in a background tab
-    const task = page.render({ canvasContext: ctx, viewport: vp, intent: "print" });
-    if (hi) state.hiTask = task;
-    try {
-      await task.promise;
-    } catch (err) {
-      if (hi) state.hiTask = null;
-      page.cleanup();
-      if (err && err.name === "RenderingCancelledException") return;
-      throw err;
-    }
-    if (hi) state.hiTask = null;
-
-    const rec = state.pages[i];
-    await new Promise((resolve) =>
-      canvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob);
-        if (level === "thumb") {
-          if (rec.thumb) URL.revokeObjectURL(rec.thumb);
-          rec.thumb = url;
-          // Don't downgrade a page that already holds something better.
-          if (!rec.src) rec.img.src = url;
-        } else {
-          const old = rec.src;
-          rec.src = url;
-          rec.img.src = url;
-          rec.level = level;
-          if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);
-        }
-        if (rec.loading) rec.loading.hidden = true;
-        rec.rendered = true;
-        resolve();
-      }, "image/jpeg", hi ? 0.92 : (level === "thumb" ? 0.72 : 0.86))
+  els.stage.addEventListener("touchmove", (e) => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();                       // no browser page zoom as well
+    const t = [e.touches[0], e.touches[1]];
+    const now = spread(t);
+    if (!pinch.from || !now) return;
+    setZoom(
+      pinch.zoom * (now / pinch.from),
+      (t[0].clientX + t[1].clientX) / 2,
+      (t[0].clientY + t[1].clientY) / 2
     );
+  }, { passive: false });
 
-    // Always leave a thumbnail behind. The grid and the link previews use it
-    // and nothing ever revokes it, so they can't be left pointing at a
-    // full-size blob that trimCache later releases.
-    if (!rec.thumb) {
-      const tw = LEVEL_PX.thumb;
-      const tc = document.createElement("canvas");
-      tc.width = tw;
-      tc.height = Math.max(1, Math.round(tw * canvas.height / canvas.width));
-      tc.getContext("2d").drawImage(canvas, 0, 0, tc.width, tc.height);
-      await new Promise((res) =>
-        tc.toBlob((bl) => {
-          if (bl) rec.thumb = URL.createObjectURL(bl);
-          res();
-        }, "image/jpeg", 0.72)
-      );
-    }
-    noteThumb(i);   // a thumbnail-level render already had one; still tell the grid
-
-    if (state.text[i] == null) {
-      try {
-        const tc = await page.getTextContent();
-        state.text[i] = tc.items.map((it) => it.str).join(" ").replace(/\s+/g, " ");
-      } catch { state.text[i] = ""; }
-    }
-
-    await placeLinks(page, vp, rec.linkLayer);
-    page.cleanup();
-  }
+  const endPinch = (e) => { if (!e.touches || e.touches.length < 2) pinch = null; };
+  els.stage.addEventListener("touchend", endPinch);
+  els.stage.addEventListener("touchcancel", endPinch);
 
   /* ══ Link preview ══════════════════════════════════════════════════════
      Hovering a link in the notebook shows a small card: a thumbnail of the
@@ -1025,15 +877,6 @@
   let peekLink = null;          // the link the open card belongs to
   let peekWaitingFor = -1;      // page whose thumbnail the card is waiting on
 
-  // Push a page to the head of the render queue so its preview image appears
-  // straight away instead of waiting behind 200-odd other pages.
-  function rushThumb(pageIdx) {
-    const rec = state.pages[pageIdx];
-    if (!rec || rec.thumb || rec.src) return;   // already has something to show
-    state.urgent.add(pageIdx);
-    state.renderQueue.add(pageIdx);
-    prioritizeRender();
-  }
 
   // Called once that page finishes, so a card showing "Still loading" swaps
   // in the real thumbnail without the reader having to move the pointer.
@@ -1060,8 +903,7 @@
       const rec = state.pages[t];
       const shot = document.createElement("div");
       shot.className = "peek-shot";
-      const shotSrc = rec && rec.thumb;
-      if (!shotSrc) { peekWaitingFor = t; rushThumb(t); }
+      const shotSrc = thumbUrl(t);
       if (shotSrc) {
         const img = document.createElement("img");
         img.src = shotSrc;
@@ -1170,9 +1012,6 @@
     const link = e.target.closest && e.target.closest("[data-peek]");
     if (!link) return;
     clearTimeout(peekTimer);
-    // Ask for the thumbnail the moment the pointer lands, not when the card
-    // opens — that head start is usually enough for the image to be ready.
-    if (link.dataset.peek === "page") rushThumb(+link.dataset.page);
     peekTimer = setTimeout(() => {
       buildPeek(link);
       placePeek(link);
@@ -1200,66 +1039,39 @@
   document.addEventListener("pointerdown", hidePeek, true);
   window.addEventListener("wheel", hidePeek, { passive: true });
 
-  // Redraw the page(s) on screen at full detail once the reader zooms in.
-  let upscaleTimer = null;
-  function scheduleUpscale() {
-    clearTimeout(upscaleTimer);
-    if (state.zoom <= 1.25) return;
-    upscaleTimer = setTimeout(async () => {
-      // Never sharpen mid-drag; the reader is moving and would feel the hitch.
-      if (state.panning || state.busy) { scheduleUpscale(); return; }
-      for (const i of visiblePages(current())) {
-        const rec = state.pages[i];
-        if (!rec || rec.level === "hi" || !rec.src) continue;
-        try { await renderPage(i, "hi"); } catch (err) { console.error("upscale", i, err); }
-        if (state.panning) break;
-      }
-    }, 320);
-  }
+  /* ══ Links inside the notebook ═════════════════════════════════════════
+     Rectangles come from the build as fractions of the page, so they sit
+     correctly over the image whatever size it is drawn at. */
 
-  /* ══ Links inside the PDF ══════════════════════════════════════════════ */
+  function placeLinks(i, layer) {
+    layer.innerHTML = "";
+    for (const l of state.links[i] || []) {
+      const a = document.createElement("a");
+      a.style.left = `${l.b[0] * 100}%`;
+      a.style.top = `${l.b[1] * 100}%`;
+      a.style.width = `${l.b[2] * 100}%`;
+      a.style.height = `${l.b[3] * 100}%`;
 
-  async function placeLinks(page, vp, layer) {
-    layer.innerHTML = "";   // a re-render must not stack a second set of links
-    let annots = [];
-    try { annots = await page.getAnnotations({ intent: "display" }); } catch { return; }
-    for (const a of annots) {
-      if (a.subtype !== "Link" || !a.rect) continue;
-      const r = pdfjsLib.Util.normalizeRect(vp.convertToViewportRectangle(a.rect));
-      const link = document.createElement("a");
-      link.style.left = `${(r[0] / vp.width) * 100}%`;
-      link.style.top = `${(r[1] / vp.height) * 100}%`;
-      link.style.width = `${((r[2] - r[0]) / vp.width) * 100}%`;
-      link.style.height = `${((r[3] - r[1]) / vp.height) * 100}%`;
-
-      // No `title` anywhere: that is what raises the browser's own tooltip
-      // box. The hover preview below replaces it.
-      if (a.url) {
-        link.href = a.url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.dataset.peek = "url";
-        link.dataset.url = a.url;
-      } else if (a.dest) {
-        try {
-          const dest = typeof a.dest === "string" ? await state.pdf.getDestination(a.dest) : a.dest;
-          const target = await state.pdf.getPageIndex(dest[0]);
-          // Deliberately NOT an href. An <a href="#"> makes Chrome print the
-          // URL in its status bar in the corner of the window, which is both
-          // ugly and meaningless for a jump inside the book.
-          link.removeAttribute("href");
-          link.setAttribute("role", "link");
-          link.tabIndex = 0;
-          link.dataset.peek = "page";
-          link.dataset.page = String(target);
-          link.addEventListener("click", (e) => { e.preventDefault(); goTo(target); });
-          link.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goTo(target); }
-          });
-        } catch { continue; }
+      if (l.u) {
+        a.href = l.u;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.dataset.peek = "url";
+        a.dataset.url = l.u;
+      } else if (typeof l.p === "number") {
+        // Deliberately not an href: an <a href="#"> makes the browser print
+        // its URL in the corner of the window, which is meaningless here.
+        a.setAttribute("role", "link");
+        a.tabIndex = 0;
+        a.dataset.peek = "page";
+        a.dataset.page = String(l.p);
+        a.addEventListener("click", (e) => { e.preventDefault(); goTo(l.p); });
+        a.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goTo(l.p); }
+        });
       } else continue;
 
-      layer.appendChild(link);
+      layer.appendChild(a);
     }
   }
 
@@ -1384,7 +1196,9 @@
   for (const type of ["mousedown", "mousemove", "mouseup",
                       "touchstart", "touchmove", "touchend"]) {
     els.bookWrap.addEventListener(type, (e) => {
-      if (state.tool) e.stopPropagation();
+      // A tool in hand, or a second finger down for a pinch, both mean this
+      // gesture is not a page turn.
+      if (state.tool || (e.touches && e.touches.length >= 2)) e.stopPropagation();
     }, true);
   }
 
@@ -1699,9 +1513,9 @@
     els.searchList.innerHTML = "";
     if (q.length < 2) {
       els.searchStatus.hidden = false;
-      els.searchStatus.textContent = state.renderedCount < state.pageCount
-        ? `Still reading the pages… ${state.renderedCount} of ${state.pageCount} ready.`
-        : "Type at least two letters to search.";
+      els.searchStatus.textContent = state.text.length
+        ? "Type at least two letters to search."
+        : "Still loading the words…";
       return;
     }
 
@@ -1742,22 +1556,13 @@
 
     els.searchStatus.hidden = hits > 0;
     if (!hits) {
-      els.searchStatus.textContent = state.renderedCount < state.pageCount
-        ? `Nothing yet — still reading the pages (${state.renderedCount} of ${state.pageCount}).`
-        : `No pages contain “${els.searchInput.value.trim()}”.`;
+      els.searchStatus.textContent = state.text.length
+        ? `No pages contain “${els.searchInput.value.trim()}”.`
+        : "Still loading the words…";
     }
   }
 
   /* ══ All-pages grid ════════════════════════════════════════════════════ */
-
-  // A page can finish rendering while the grid is open; fill its tile in.
-  function noteThumb(i) {
-    const rec = state.pages[i];
-    if (!rec || !rec.thumb || els.gridOverlay.hidden) return;
-    const tile = els.pageGrid.querySelector(`.thumb-img[data-page="${i}"]`);
-    if (!tile || tile.getAttribute("src")) return;
-    tile.src = rec.thumb;
-  }
 
   // While the grid is open, the tiles on screen get their pages pushed to the
   // front of the render queue, so the stretch you scrolled to fills in rather
@@ -1770,7 +1575,7 @@
     const top = box.top - 300, bottom = box.bottom + 300;   // include a margin
     for (const img of els.pageGrid.querySelectorAll(".thumb-img:not([src])")) {
       const r = img.getBoundingClientRect();
-      if (r.bottom > top && r.top < bottom) rushThumb(+img.dataset.page);
+      if (r.bottom > top && r.top < bottom) img.src = thumbUrl(+img.dataset.page);
     }
   }
 
@@ -1795,7 +1600,7 @@
       // whose picture has not arrived yet.
       img.alt = "";
       img.dataset.page = String(i);
-      if (rec && rec.thumb) img.src = rec.thumb;
+      // Left unset so the browser fetches it only when it scrolls into view.
 
       const cap = document.createElement("span");
       cap.className = "thumb-cap";
@@ -1969,16 +1774,16 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try {
-        localStorage.setItem(LS.marks(state.fp), JSON.stringify(state.marks));
-        localStorage.setItem(LS.mine(state.fp), JSON.stringify(state.mine));
+        localStorage.setItem(LS.marks(state.pageCount), JSON.stringify(state.marks));
+        localStorage.setItem(LS.mine(state.pageCount), JSON.stringify(state.mine));
       } catch (err) { console.warn("could not save", err); }
     }, 350);
   }
 
   function loadPersonal() {
     try {
-      state.marks = JSON.parse(localStorage.getItem(LS.marks(state.fp))) || {};
-      state.mine = JSON.parse(localStorage.getItem(LS.mine(state.fp))) || [];
+      state.marks = JSON.parse(localStorage.getItem(LS.marks(state.pageCount))) || {};
+      state.mine = JSON.parse(localStorage.getItem(LS.mine(state.pageCount))) || [];
     } catch {
       state.marks = {};
       state.mine = [];

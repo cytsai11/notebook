@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=51">
+<link rel="stylesheet" href="styles.css?v=55">
 </head>
 <body>
 
@@ -87,21 +87,15 @@
          is simply blank for the length of a 50 MB download. -->
     <div class="boot" id="bootCard">
       <p class="boot-title">Opening the notebook…</p>
-      <div class="boot-track"><div class="boot-fill" id="bootFill"></div></div>
-      <p class="boot-sub" id="bootSub">Starting…</p>
-      <p class="boot-note">It is a big file, so the first visit takes a moment.
-        After that your browser keeps a copy and it opens straight away.</p>
+      <div class="boot-track"><div class="boot-fill unknown"></div></div>
     </div>
 
     <!-- Shown only if notebook.pdf is missing -->
     <div class="drop-zone" id="dropCard" hidden>
-      <button class="drop-arrow" id="dropBtn" aria-label="Choose a PDF to open">
-        <svg viewBox="0 0 24 24"><path d="M12 3v11M12 14l-4.5-4.5M12 14l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-      </button>
-      <p class="drop-title">Drop your notebook PDF here</p>
-      <p class="drop-sub">…or click the arrow to pick a file. To make it open by itself every time,
-        put the file in this website&rsquo;s folder and name it <code>notebook.pdf</code>.</p>
-      <input type="file" id="fileInput" accept="application/pdf" hidden>
+      <p class="drop-title">The notebook pages are missing</p>
+      <p class="drop-sub">This site reads pre-built page images. Put
+        <code>notebook.pdf</code> in the folder, then run
+        <code>cd tools &amp;&amp; npm run build</code> to create them.</p>
     </div>
 
     <div class="zoom-pad" id="zoomPad" hidden>
@@ -121,7 +115,6 @@
       </button>
     </div>
 
-    <p class="load-chip" id="loadChip" hidden>Loading 0%</p>
     <p class="tool-hint" id="toolHint" hidden></p>
   </main>
 
@@ -287,9 +280,8 @@
   </details>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="config.js?v=51"></script>
-<script src="app.js?v=51"></script>
+<script src="config.js?v=55"></script>
+<script src="app.js?v=55"></script>
 </body>
 </html>
