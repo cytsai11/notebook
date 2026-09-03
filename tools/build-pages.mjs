@@ -56,12 +56,24 @@ const OUT = path.join(SITE, "pages");
 // gives noticeably cleaner text than rendering small in the first place.
 const MASTER = 2000;
 const SIZES = {
-  p: { width: 1800, quality: 80 },   // reading + zoom
+  p: { width: 1800, quality: 80 },   // zoomed in
+  m: { width: 1200, quality: 80 },   // ordinary reading
   t: { width: 220, quality: 70 },    // grid tiles and hover previews
 };
 
+// Reading size exists because decoding matters as much as downloading. A
+// 1800 px page costs about 40 ms of main thread to decode and 18 MB to hold;
+// 1200 px is a quarter of that, still sharp at the size a page is actually
+// drawn, and cheap enough that every page near the reader can carry one.
+
 const pad = (n) => String(n).padStart(4, "0");
-const limit = Number(process.argv[2]) || 0;   // optional: build only N pages
+
+const args = process.argv.slice(2);
+const limit = Number(args.find((a) => /^\d+$/.test(a))) || 0;   // build only N pages
+// --only=m rebuilds one size without touching the others.
+const onlyArg = args.find((a) => a.startsWith("--only="));
+const only = onlyArg ? onlyArg.slice(7).split(",").filter(Boolean) : null;
+const wanted = Object.entries(SIZES).filter(([k]) => !only || only.includes(k));
 
 async function main() {
   const data = new Uint8Array(await readFile(path.join(SITE, "notebook.pdf")));
@@ -84,8 +96,8 @@ async function main() {
   const count = limit ? Math.min(limit, doc.numPages) : doc.numPages;
   console.log(`notebook.pdf: ${doc.numPages} pages, building ${count}`);
 
-  if (!limit) await rm(OUT, { recursive: true, force: true });
-  for (const key of Object.keys(SIZES)) {
+  if (!limit && !only) await rm(OUT, { recursive: true, force: true });
+  for (const [key] of wanted) {
     await mkdir(path.join(OUT, key), { recursive: true });
   }
 
@@ -108,7 +120,7 @@ async function main() {
     await page.render({ canvasContext: ctx, viewport: vp, canvasFactory }).promise;
 
     const master = canvas.toBuffer("image/png");
-    for (const [key, cfg] of Object.entries(SIZES)) {
+    for (const [key, cfg] of wanted) {
       const buf = await sharp(master)
         .resize({ width: cfg.width, fit: "inside", kernel: "lanczos3" })
         .webp({ quality: cfg.quality, effort: 4 })
@@ -126,6 +138,11 @@ async function main() {
     }
   }
   process.stdout.write("\n");
+
+  if (limit) {
+    console.log("partial build — index.json and text.json left alone");
+    return;
+  }
 
   await writeFile(
     path.join(OUT, "index.json"),

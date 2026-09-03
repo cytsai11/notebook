@@ -385,7 +385,7 @@ body.drawing .pan-catch { display: none !important; }
   position: relative;
   width: 100%;
   height: 100%;
-  background: #fff;
+  background: #fff center / 100% 100% no-repeat;
 }
 
 /* Until a page is rasterised the img has no src — hide it so the browser
@@ -399,7 +399,15 @@ body.drawing .pan-catch { display: none !important; }
   height: 100%;
   object-fit: fill;
   user-select: none;
+  /* A page normally has its picture ready before it is looked at, and .ready
+     is set in the same frame as the src — so this fade only ever runs for a
+     page the reader jumped to faster than it could load, where it eases the
+     thumbnail backdrop into focus instead of snapping. */
+  opacity: 0;
+  transition: opacity .22s ease;
 }
+
+.page-img.ready { opacity: 1; }
 
 .page-loading {
   position: absolute;

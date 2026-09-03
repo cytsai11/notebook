@@ -185,8 +185,11 @@
      not as a PDF the browser has to rasterise. Startup is therefore just a
      small manifest, and each page image is fetched only when it is needed. */
 
-  const pageUrl = (i) => `pages/p/${String(i + 1).padStart(4, "0")}.webp`;
-  const thumbUrl = (i) => `pages/t/${String(i + 1).padStart(4, "0")}.webp`;
+  // Three sizes of the same page. Which one a page carries depends on what
+  // it is being asked to do, not on how far along the loading is.
+  const pageUrl = (i) => `pages/p/${String(i + 1).padStart(4, "0")}.webp`;   // zoomed in
+  const readUrl = (i) => `pages/m/${String(i + 1).padStart(4, "0")}.webp`;   // reading
+  const thumbUrl = (i) => `pages/t/${String(i + 1).padStart(4, "0")}.webp`;  // grid, previews
 
   async function boot() {
     await loadAuthorBookmarks();
@@ -258,32 +261,76 @@
      ones it has fetched, so turning back is instant. */
 
   const ATTACH = 4;   // pages carrying an image at all
-  const WARM = 10;    // pages whose full image is fetched ahead of time
+  const DECODE = 5;   // pages whose picture is turned into a bitmap in advance
+  const WARM = 8;     // pages pulled into the browser cache ahead of the reader
 
   // Fetched but not attached. Holding the Image keeps the request alive; the
   // bytes then sit in the browser cache, so attaching later costs no network.
   const warmed = new Map();
 
-  function warm(i) {
-    if (i < 0 || i >= state.pageCount || warmed.has(i)) return;
-    const im = new Image();
-    warmed.set(i, im);
-    im.src = pageUrl(i);
-    // Bound the set, or a long read would hold every page open at once.
-    if (warmed.size > WARM * 3) warmed.delete(warmed.keys().next().value);
+  function warm(i, prepare) {
+    if (i < 0 || i >= state.pageCount) return null;
+    let im = warmed.get(i);
+    if (!im) {
+      im = new Image();
+      im.decoding = "async";
+      warmed.set(i, im);
+      im.src = readUrl(i);
+      // Bound the set, or a long read would hold every page open at once.
+      if (warmed.size > WARM * 2 + 6) warmed.delete(warmed.keys().next().value);
+    }
+    // Decoding here, while nothing is moving, is the point of the whole
+    // exercise: the page a turn lands on is already a finished bitmap, so it
+    // can go up sharp on the first frame instead of arriving soft and
+    // resolving a moment later.
+    if (prepare && !im.prepared && im.decode) {
+      im.prepared = true;
+      im.decode().catch(() => { /* replaced or failed — nothing to prepare */ });
+    }
+    return im;
   }
+
+  const bitmapReady = (i) => {
+    const im = warmed.get(i);
+    return !!(im && im.complete && im.naturalWidth);
+  };
 
   function attach(rec, i) {
     if (rec.level) return;
-    rec.level = "thumb";
-    rec.img.src = thumbUrl(i);          // ~6 KB: decodes in about a millisecond
+    warm(i, true);
+
+    // The thumbnail sits behind the real image as a backdrop, never as a
+    // stand-in that has to be swapped out. When the reading image is already
+    // prepared — which is the normal case — it covers the thumbnail on its
+    // first paint and the reader never sees anything soft.
+    const backdrop = new Image();
+    backdrop.onload = () => {
+      if (!rec.level) return;
+      rec.el.querySelector(".page-inner").style.backgroundImage = `url("${thumbUrl(i)}")`;
+      if (rec.loading) rec.loading.hidden = true;
+    };
+    backdrop.src = thumbUrl(i);
+
+    setLevel(rec, i, "read");
     if (!rec.linked) { rec.linked = true; placeLinks(i, rec.linkLayer); }
   }
 
   function setLevel(rec, i, level) {
     if (rec.level === level) return;
+    const first = !rec.level;
     rec.level = level;
-    rec.img.src = level === "full" ? pageUrl(i) : thumbUrl(i);
+    // On a change of size the element keeps painting the picture it already
+    // has until the new one is ready, so an upgrade is never a blank frame.
+    rec.img.src = level === "zoom" ? pageUrl(i) : readUrl(i);
+    if (!first) return;
+
+    if (rec.img.complete && rec.img.naturalWidth) {
+      rec.img.classList.add("ready");        // same frame: no fade at all
+    } else {
+      const show = () => rec.img.classList.add("ready");
+      rec.img.addEventListener("load", show, { once: true });
+      rec.img.addEventListener("error", show, { once: true });
+    }
   }
 
   function showNear() {
@@ -295,26 +342,37 @@
         attach(rec, i);
       } else if (rec.level) {
         rec.level = null;
+        rec.img.classList.remove("ready");
         rec.img.removeAttribute("src");
+        rec.el.querySelector(".page-inner").style.backgroundImage = "";
         if (rec.loading) rec.loading.hidden = false;
       }
     }
     sharpen();
   }
 
-  // Full-resolution images are ~18 MB each once decoded, so only the spread
-  // actually on screen keeps one. Everything else falls back to its thumbnail,
-  // which is what stops a long read from getting heavier and heavier.
+  // Reading size is what every nearby page carries; it is sharp at the size a
+  // page is actually drawn and costs a quarter of what the zoom image costs to
+  // decode and hold. The zoom image is fetched only for the spread being
+  // magnified, which is what stops a long read from getting heavier.
   function sharpen() {
     if (state.busy) return;             // never during a turn: that is the jank
     const cur = current();
     const on = visiblePages(cur);
+    const magnified = state.zoom > 1.2;
     for (let i = 0; i < state.pageCount; i++) {
       const rec = state.pages[i];
       if (!rec || !rec.level) continue;
-      setLevel(rec, i, on.indexOf(i) !== -1 ? "full" : "thumb");
+      if (on.indexOf(i) !== -1) {
+        if (magnified) setLevel(rec, i, "zoom");
+      } else {
+        setLevel(rec, i, "read");
+      }
     }
-    for (let d = 0; d <= WARM; d++) { warm(cur - d); warm(cur + d); }
+    for (let d = 0; d <= WARM; d++) {
+      warm(cur - d, d <= DECODE);
+      warm(cur + d, d <= DECODE);
+    }
   }
 
   // Search needs every page's words, but nothing needs them in the first
@@ -653,6 +711,7 @@
     const r2 = els.zoomPad.getBoundingClientRect();
     els.stage.scrollLeft += (r2.left + fx * r2.width) - ax;
     els.stage.scrollTop += (r2.top + fy * r2.height) - ay;
+    sharpen();      // magnifying past the reading size calls for the big image
   }
 
   const zoomStep = (dir, x, y) => {
