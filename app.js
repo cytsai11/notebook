@@ -895,12 +895,51 @@
 
   const current = () => (state.pf ? state.pf.getCurrentPageIndex() : 0);
 
+  /* ══ Going back ════════════════════════════════════════════════════════
+     A bookmark, a search hit, a link inside the notebook — each of these can
+     drop the reader two hundred pages from where they were, with no obvious
+     way home. Every one of those routes lands here, so this is where the
+     trail gets kept. */
+
+  const TRAIL = 30;         // how far back the trail remembers
+  const trail = [];         // pages jumped away from, most recent last
+  let returning = false;    // walking the trail must not extend it
+
+  function noteJump(from, to) {
+    // Turning a page, or a spread, is not somewhere a reader needs help
+    // getting back from — only a jump that skips content counts.
+    if (returning || Math.abs(to - from) <= 2) return;
+    if (trail[trail.length - 1] === from) return;   // already the way back
+    trail.push(from);
+    if (trail.length > TRAIL) trail.shift();
+    syncTrail();
+  }
+
+  function goBack() {
+    if (!trail.length) return;
+    const to = trail.pop();
+    returning = true;
+    goTo(to);
+    returning = false;
+    syncTrail();
+  }
+
+  function syncTrail() {
+    const b = $("btnBack");
+    if (!b) return;
+    b.disabled = !trail.length;
+    b.title = trail.length
+      ? `Back to page ${trail[trail.length - 1] + 1}, where you jumped from`
+      : "Nothing to go back to yet";
+  }
+
   function goTo(idx, instant) {
     if (!state.pf) return;
     idx = Math.max(0, Math.min(state.pageCount - 1, idx));
     hidePeek();
 
     if (idx === current()) return;
+    noteJump(current(), idx);
     // Opening straight onto a deep link should not animate 200 pages past.
     if (instant && state.pf.turnToPage) {
       state.pf.turnToPage(idx);
@@ -1828,6 +1867,7 @@
 
   /* ══ Navigation controls ═══════════════════════════════════════════════ */
 
+  $("btnBack").addEventListener("click", goBack);
   $("btnPrev").addEventListener("click", () => state.pf && state.pf.flipPrev());
   $("btnNext").addEventListener("click", () => state.pf && state.pf.flipNext());
 

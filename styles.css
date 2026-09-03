@@ -288,25 +288,6 @@ html[data-theme="dark"] .author-bar { color: #2a2410; }
 .ab-btn.primary { background: #1b1f26; color: #fff; border-color: #1b1f26; }
 .ab-btn.primary:hover { background: #000; }
 
-/* ── Loading readout ─────────────────────────────────────────────────── */
-.load-chip {
-  position: absolute;
-  left: 14px;
-  bottom: 16px;
-  z-index: 14;
-  margin: 0;
-  padding: 8px 14px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-}
-
-.stage.zoomed .load-chip { position: fixed; bottom: calc(var(--scrub-h) + 12px); }
-
 /* ── Stage ───────────────────────────────────────────────────────────── */
 .stage {
   position: relative;
@@ -556,34 +537,6 @@ body.drawing .page-inner { cursor: crosshair; }
    the fold. Replacing opacity outright would pin it to one value. */
 .stf__hardShadow,
 .stf__hardInnerShadow { filter: opacity(.45); }
-
-/* Edge arrows */
-.edge-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 12;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 82px;
-  color: var(--ink-2);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  opacity: .85;
-  transition: opacity .14s, background .14s;
-}
-
-.edge-nav:hover:not(:disabled) { opacity: 1; background: var(--panel-2); }
-.edge-nav:disabled { opacity: .2; cursor: default; }
-.edge-nav svg { width: 24px; height: 24px; }
-.edge-left { left: 12px; }
-.edge-right { right: 12px; }
-
-@media (max-width: 900px) { .edge-nav { display: none; } }
 
 /* Floating zoom control */
 .zoomer {
@@ -867,7 +820,6 @@ body.drawing .page-inner { cursor: crosshair; }
   right: calc(var(--rail-w) + 14px);
   bottom: calc(var(--scrub-h) + 16px);
 }
-.stage.zoomed .edge-nav { position: fixed; top: calc(50% + var(--topbar-h) / 2); }
 
 /* Hint shown while a drawing tool is on */
 .tool-hint {
@@ -1513,8 +1465,6 @@ kbd {
   .tbtn { padding: 0 10px; }
   .rbtn { font-size: 9.5px; padding: 7px 2px; }
   .rbtn svg { width: 18px; height: 18px; }
-  .load-chip { bottom: auto; top: 12px; }
-  .stage.zoomed .load-chip { position: fixed; top: calc(var(--topbar-h) + 12px); bottom: auto; }
 }
 
 @media (max-width: 620px) {
