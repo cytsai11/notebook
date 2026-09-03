@@ -257,24 +257,64 @@
      pull tens of megabytes for pages nobody opens; the browser keeps the
      ones it has fetched, so turning back is instant. */
 
-  const KEEP = 6;
+  const ATTACH = 4;   // pages carrying an image at all
+  const WARM = 10;    // pages whose full image is fetched ahead of time
+
+  // Fetched but not attached. Holding the Image keeps the request alive; the
+  // bytes then sit in the browser cache, so attaching later costs no network.
+  const warmed = new Map();
+
+  function warm(i) {
+    if (i < 0 || i >= state.pageCount || warmed.has(i)) return;
+    const im = new Image();
+    warmed.set(i, im);
+    im.src = pageUrl(i);
+    // Bound the set, or a long read would hold every page open at once.
+    if (warmed.size > WARM * 3) warmed.delete(warmed.keys().next().value);
+  }
+
+  function attach(rec, i) {
+    if (rec.level) return;
+    rec.level = "thumb";
+    rec.img.src = thumbUrl(i);          // ~6 KB: decodes in about a millisecond
+    if (!rec.linked) { rec.linked = true; placeLinks(i, rec.linkLayer); }
+  }
+
+  function setLevel(rec, i, level) {
+    if (rec.level === level) return;
+    rec.level = level;
+    rec.img.src = level === "full" ? pageUrl(i) : thumbUrl(i);
+  }
 
   function showNear() {
     const cur = current();
     for (let i = 0; i < state.pageCount; i++) {
       const rec = state.pages[i];
       if (!rec) continue;
-      const near = Math.abs(i - cur) <= KEEP;
-      if (near && !rec.shown) {
-        rec.shown = true;
-        rec.img.src = pageUrl(i);
-        if (!rec.linked) { rec.linked = true; placeLinks(i, rec.linkLayer); }
-      } else if (!near && rec.shown) {
-        rec.shown = false;
+      if (Math.abs(i - cur) <= ATTACH) {
+        attach(rec, i);
+      } else if (rec.level) {
+        rec.level = null;
         rec.img.removeAttribute("src");
         if (rec.loading) rec.loading.hidden = false;
       }
     }
+    sharpen();
+  }
+
+  // Full-resolution images are ~18 MB each once decoded, so only the spread
+  // actually on screen keeps one. Everything else falls back to its thumbnail,
+  // which is what stops a long read from getting heavier and heavier.
+  function sharpen() {
+    if (state.busy) return;             // never during a turn: that is the jank
+    const cur = current();
+    const on = visiblePages(cur);
+    for (let i = 0; i < state.pageCount; i++) {
+      const rec = state.pages[i];
+      if (!rec || !rec.level) continue;
+      setLevel(rec, i, on.indexOf(i) !== -1 ? "full" : "thumb");
+    }
+    for (let d = 0; d <= WARM; d++) { warm(cur - d); warm(cur + d); }
   }
 
   // Search needs every page's words, but nothing needs them in the first
@@ -331,7 +371,7 @@
       // so a page being fetched shows its number rather than a white gap.
       img.addEventListener("load", () => { if (loading) loading.hidden = true; });
       state.pages.push({ el, img, loading, anno, ctx: anno.getContext("2d"), linkLayer,
-        shown: false, linked: false });
+        level: null, linked: false });
       redraw(i);
     }
   }
@@ -382,6 +422,7 @@
         // screen — so it must not animate, or the slide plays a second time.
         const tracked = state.coverTurn;
         stopCoverTrack();
+        sharpen();          // upgrade the spread now that nothing is moving
         if (state.pendingIdx !== null) { state.pendingIdx = null; buildTabs(); }
         applyZoom(!tracked);
       }
