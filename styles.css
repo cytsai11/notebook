@@ -735,6 +735,17 @@ body.drawing .page-inner { cursor: crosshair; }
   pointer-events: none;
 }
 
+/* Rides under the pointer along the bar. It is never seen — the preview card
+   is placed from where it sits, and nothing else reads it. */
+.scrub-anchor {
+  position: absolute;
+  bottom: 28px;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .mark {
   position: absolute;
   bottom: 0;

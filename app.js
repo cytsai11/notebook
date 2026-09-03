@@ -18,7 +18,8 @@
 
   const els = {
     stage: $("stage"), zoomPad: $("zoomPad"), bookWrap: $("bookWrap"),
-    book: $("book"), scrubBar: $("scrubBar"), scrubMarks: $("scrubMarks"),
+    book: $("book"), scrubBar: $("scrubBar"), scrubTrack: $("scrubTrack"),
+    scrubMarks: $("scrubMarks"),
     scrubFill: $("scrubFill"), scrubLast: $("scrubLast"),
     dropCard: $("dropCard"),
     pageInput: $("pageInput"), pageTotal: $("pageTotal"),
@@ -1902,6 +1903,73 @@
   $("btnNext").addEventListener("click", () => state.pf && state.pf.flipNext());
 
   els.pageInput.addEventListener("change", () => goTo((parseInt(els.pageInput.value, 10) || 1) - 1));
+  /* ══ Previewing along the bar ══════════════════════════════════════════
+     The bar stands for the whole notebook, so pointing at a place on it is
+     asking what is there. The bookmarks answer that already; this answers it
+     everywhere in between, and keeps answering while the bar is dragged.
+
+     It reuses the card the bookmarks and links use, driven from a hairline
+     anchor that rides under the pointer — placePeek reads only where the
+     anchor sits, so nothing about the card needs to know it is moving. */
+
+  const scrubAnchor = document.createElement("div");
+  scrubAnchor.className = "scrub-anchor";
+  scrubAnchor.dataset.peek = "page";
+  els.scrubTrack.appendChild(scrubAnchor);
+
+  let scrubbing = false;
+  let scrubIdx = -1;
+
+  function scrubPeek(clientX) {
+    if (!state.pageCount) return;
+    const r = els.scrubTrack.getBoundingClientRect();
+    if (!r.width) return;
+
+    const x = Math.max(0, Math.min(r.width, clientX - r.left));
+    // The inverse of pageFraction, so the preview names the page whose
+    // bookmark would sit under the pointer.
+    const idx = Math.round((x / r.width) * (state.pageCount - 1));
+
+    scrubAnchor.style.left = `${x}px`;
+    clearTimeout(peekTimer);          // no waiting: this is a scrubbing gesture
+
+    if (idx !== scrubIdx || peekLink !== scrubAnchor) {
+      scrubIdx = idx;
+      scrubAnchor.dataset.page = String(idx);
+      buildPeek(scrubAnchor);
+    }
+    placePeek(scrubAnchor);           // follows the pointer even when idle
+  }
+
+  function endScrub() { scrubbing = false; scrubIdx = -1; }
+
+  els.scrubTrack.addEventListener("pointermove", (e) => {
+    // A bookmark has a fuller card of its own — let it answer for itself.
+    if (e.target.closest && e.target.closest(".mark")) { scrubIdx = -1; return; }
+    scrubPeek(e.clientX);
+  });
+
+  // The document-wide pointerdown hides the card before a drag begins; put it
+  // straight back, since a drag is exactly when the preview earns its keep.
+  els.scrubTrack.addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest(".mark")) return;
+    scrubbing = true;
+    scrubPeek(e.clientX);
+  });
+
+  els.scrubTrack.addEventListener("pointerleave", () => {
+    if (scrubbing) return;            // the pointer may stray off the bar mid-drag
+    scrubIdx = -1;
+    hidePeek();
+  });
+
+  window.addEventListener("pointerup", () => {
+    if (!scrubbing) return;
+    endScrub();
+    hidePeek();                       // the page it named is the page now open
+  });
+  window.addEventListener("pointercancel", () => { endScrub(); hidePeek(); });
+
   els.pageSlider.addEventListener("input", () => { els.pageInput.value = els.pageSlider.value; });
   els.pageSlider.addEventListener("change", () => goTo(parseInt(els.pageSlider.value, 10) - 1));
 
