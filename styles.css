@@ -438,6 +438,18 @@ body.drawing .pan-catch { display: none !important; }
 
 .link-peek.is-url { max-width: 300px; }
 
+/* Plain-text hint for a control. Same card as the page and link previews, so
+   hovering anything in the interface answers in one voice — and so the
+   browser's own tooltip, which none of this can style, is never used. */
+.link-peek.is-tip { max-width: 230px; padding: 8px 11px; }
+
+.link-peek.is-tip .peek-meta b {
+  font-size: 13px;
+  white-space: normal;      /* a hint is a sentence, not a filename */
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .peek-shot {
   flex: none;
   width: 86px;

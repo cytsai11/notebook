@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=62">
+<link rel="stylesheet" href="styles.css?v=63">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   </div>
 
   <div class="pager">
-    <button class="pbtn" id="btnPrev" title="Previous page — or press the left arrow key">
+    <button class="pbtn" id="btnPrev" data-peek="tip" data-tip="Previous page" data-tip-hint="Or press the left arrow key">
       <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
       <span>Prev</span>
     </button>
@@ -32,22 +32,24 @@
       <input type="number" id="pageInput" min="1" value="1" aria-label="Page number — type a page and press Enter">
       <span class="page-total" id="pageTotal">of —</span>
     </div>
-    <button class="pbtn" id="btnNext" title="Next page — or press the right arrow key">
+    <button class="pbtn" id="btnNext" data-peek="tip" data-tip="Next page" data-tip-hint="Or press the right arrow key">
       <span>Next</span>
       <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
     </button>
   </div>
 
   <div class="topright">
-    <button class="tbtn" id="btnHelp" title="How to use this notebook">
+    <button class="tbtn" id="btnHelp" data-peek="tip" data-tip="How to use this notebook">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.4"/><path d="M12 17.1h.01"/></svg>
       <span class="tbtn-label">Help</span>
     </button>
-    <button class="tbtn icon" id="btnTheme" title="Switch between light and dark (L)">
+    <button class="tbtn icon" id="btnTheme" aria-label="Switch between light and dark"
+            data-peek="tip" data-tip="Switch between light and dark" data-tip-hint="Or press L">
       <svg viewBox="0 0 24 24" class="ic-sun"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3L19 19M19 5l-1.7 1.7M6.7 17.3L5 19"/></svg>
       <svg viewBox="0 0 24 24" class="ic-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
     </button>
-    <button class="tbtn icon" id="btnFullscreen" title="Fullscreen (F)">
+    <button class="tbtn icon" id="btnFullscreen" aria-label="Fullscreen"
+            data-peek="tip" data-tip="Fullscreen" data-tip-hint="Or press F">
       <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
   </div>
@@ -67,7 +69,7 @@
   <!-- Finding your way around -->
   <nav class="rail rail-left" aria-label="Navigation tools">
     <span class="rail-label">Tools</span>
-    <button class="rbtn" id="btnBack" disabled title="Nothing to go back to yet">
+    <button class="rbtn" id="btnBack" disabled data-peek="tip" data-tip="Nothing to go back to yet">
       <svg viewBox="0 0 24 24"><path d="M3.6 9.6A8.5 8.5 0 1 1 3.5 12"/><path d="M3.2 4.6v5h5"/><path d="M12 8v4.3l3 1.8"/></svg>
       <span>Go back</span>
     </button>
@@ -110,11 +112,11 @@
 
     <!-- Floating zoom control -->
     <div class="zoomer" id="zoomer" hidden>
-      <button class="zbtn" id="btnZoomOut" title="Zoom out (− key)" aria-label="Zoom out">
+      <button class="zbtn" id="btnZoomOut" aria-label="Zoom out" data-peek="tip" data-tip="Zoom out" data-tip-hint="Or press &minus;">
         <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
       </button>
-      <button class="zlevel" id="zoomLevel" title="Click to fit the whole page again">100%</button>
-      <button class="zbtn" id="btnZoomIn" title="Zoom in (+ key)" aria-label="Zoom in">
+      <button class="zlevel" id="zoomLevel" data-peek="tip" data-tip="Fit the whole page again">100%</button>
+      <button class="zbtn" id="btnZoomIn" aria-label="Zoom in" data-peek="tip" data-tip="Zoom in" data-tip-hint="Or press +">
         <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
@@ -286,7 +288,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="config.js?v=62"></script>
-<script src="app.js?v=62"></script>
+<script src="config.js?v=63"></script>
+<script src="app.js?v=63"></script>
 </body>
 </html>

@@ -928,7 +928,7 @@
     const b = $("btnBack");
     if (!b) return;
     b.disabled = !trail.length;
-    b.title = trail.length
+    b.dataset.tip = trail.length
       ? `Back to page ${trail[trail.length - 1] + 1}, where you jumped from`
       : "Nothing to go back to yet";
   }
@@ -1085,6 +1085,29 @@
   function buildPeek(link) {
     peek.innerHTML = "";
     peekLink = link;
+    peek.classList.remove("is-url", "is-tip");
+
+    // A control saying what it does. The browser will do this itself from a
+    // title attribute, but that tooltip cannot be styled, arrives on its own
+    // schedule and looks nothing like the rest of the notebook — so nothing
+    // here uses one.
+    if (link.dataset.peek === "tip") {
+      const meta = document.createElement("div");
+      meta.className = "peek-meta";
+      const head = document.createElement("b");
+      head.textContent = link.dataset.tip || "";
+      meta.appendChild(head);
+      if (link.dataset.tipHint) {
+        const hint = document.createElement("span");
+        hint.className = "peek-hint";
+        hint.textContent = link.dataset.tipHint;
+        meta.appendChild(hint);
+      }
+      peek.appendChild(meta);
+      peek.classList.add("is-tip");
+      return;
+    }
+
     if (link.dataset.peek === "page") {
       const t = +link.dataset.page;
       const rec = state.pages[t];
@@ -1121,8 +1144,14 @@
       hint.textContent = "Click to jump there";
       meta.appendChild(hint);
 
+      if (link.dataset.removable) {
+        const rm = document.createElement("span");
+        rm.className = "peek-hint";
+        rm.textContent = "Right-click to remove";
+        meta.appendChild(rm);
+      }
+
       peek.append(shot, meta);
-      peek.classList.remove("is-url");
     } else {
       const url = link.dataset.url || "";
       let host = url, rest = "";
@@ -1172,7 +1201,7 @@
       return;
     }
 
-    const beside = !!link.closest(".panel");
+    const beside = !!link.closest(".panel, .rail");
     if (beside) {
       const roomRight = window.innerWidth - r.right;
       left = roomRight >= w + 16 ? r.right + 10 : r.left - w - 10;
@@ -1546,7 +1575,7 @@
         e.preventDefault();
         removeBookmark(bm, isMine);
       });
-      m.title = "Right-click to remove";
+      m.dataset.removable = "1";
     }
 
     els.scrubMarks.appendChild(m);
@@ -1680,7 +1709,8 @@
   function actBtn(title, glyph, fn) {
     const b = document.createElement("button");
     b.className = "row-act";
-    b.title = title;
+    b.dataset.peek = "tip";
+    b.dataset.tip = title;
     b.setAttribute("aria-label", title);
     b.textContent = glyph;
     b.addEventListener("click", fn);
