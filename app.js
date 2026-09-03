@@ -74,7 +74,7 @@
     authorFile: [],               // what bookmarks.json actually holds
     authorMode: false,
     zoom: 1, fitW: 0, fitH: 0,
-    busy: false, busyUntil: 0,
+    busy: false, busyUntil: 0, folded: false,
     panning: false, coverTurn: false, pendingIdx: null, links: [],
     bmColor: PALETTE[0],
   };
@@ -514,6 +514,7 @@
       // rests there. The deadline is a belt-and-braces stop against a state
       // that never resolves.
       const turning = e.data === "flipping" || e.data === "user_fold";
+      state.folded = e.data === "fold_corner";
       state.busy = turning;
       state.busyUntil = turning ? Date.now() + 1400 : 0;
 
@@ -1410,12 +1411,58 @@
   // uses pointer events. Catching only the former on the way down — before
   // they reach the book the library listens on — stops every fold, including
   // the corner-lift preview, without touching the strokes themselves.
+  /* Reaching for a link should not lift the page.
+
+     StPageFlip peels a corner as soon as the pointer wanders into one, and its
+     idea of a corner is a fifth of the page diagonal in from BOTH edges — on a
+     page this size, a square about 130px on a side. Anything in there folds,
+     links included, so a reader aiming at a link near the edge of the page got
+     a curling corner instead of a hyperlink.
+
+     Withhold the moves that would cause it: over a link, always, and elsewhere
+     unless the pointer really is at a corner. A press that began on the page
+     still passes everything through, so dragging a page across still works. */
+  const FOLD_CORNER = 0.16;      // of the page, in from an outer corner
+
+  let pressingBook = false;
+
+  const overLink = (e) =>
+    !!(e.target && e.target.closest && e.target.closest(".link-layer a"));
+
+  function atFoldCorner(e) {
+    const r = els.book.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    // Only the book's outer edges fold; the gutter down the middle never does.
+    const single = !state.pf || state.pf.getOrientation() === "portrait";
+    const cx = (single ? r.width : r.width / 2) * FOLD_CORNER;
+    const cy = r.height * FOLD_CORNER;
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    return (x < cx || x > r.width - cx) && (y < cy || y > r.height - cy);
+  }
+
+  // Letting go of a corner is itself a mousemove, so a fold already showing has
+  // to be told to lie back down — otherwise withholding the move that left the
+  // corner would strand the page half-lifted.
+  function unfold() {
+    if (!state.folded || !state.pf || !state.pf.getFlipController) return;
+    try { state.pf.getFlipController().showCorner({ x: -1, y: -1 }); } catch { /* nothing folded */ }
+  }
+
+  els.bookWrap.addEventListener("mousedown", (e) => {
+    // A press that starts on a link is the library's to ignore, not ours to
+    // treat as the beginning of a page turn.
+    pressingBook = !overLink(e);
+  }, true);
+  window.addEventListener("mouseup", () => { pressingBook = false; });
+
   for (const type of ["mousedown", "mousemove", "mouseup",
                       "touchstart", "touchmove", "touchend"]) {
     els.bookWrap.addEventListener(type, (e) => {
       // A tool in hand, or a second finger down for a pinch, both mean this
       // gesture is not a page turn.
-      if (state.tool || (e.touches && e.touches.length >= 2)) e.stopPropagation();
+      if (state.tool || (e.touches && e.touches.length >= 2)) { e.stopPropagation(); return; }
+      if (type !== "mousemove" || pressingBook) return;
+      if (overLink(e) || !atFoldCorner(e)) { unfold(); e.stopPropagation(); }
     }, true);
   }
 
