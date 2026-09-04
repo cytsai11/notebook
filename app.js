@@ -564,6 +564,7 @@
     // Let a third of the way across be enough. Past that the page carries on
     // by itself, which is how paper behaves once it is far enough over.
     const CARRY = 0.34;      // of the page, before the turn is taken as meant
+    let flicked = false;     // ...unless it was flicked, which counts on its own
 
     flipper.stopMove = () => {
       const calc = flipper.getCalculation();
@@ -571,13 +572,74 @@
       const at = calc.getPosition();
       const r = flipper.getBoundsRect();
       const y = calc.getCorner() === "bottom" ? r.height : 0;
-      const carried = at.x <= r.pageWidth * (1 - CARRY);
+      const carried = flicked || at.x <= r.pageWidth * (1 - CARRY);
       flipper.animateFlippingTo(
         at,
         { x: carried ? -r.pageWidth : r.pageWidth, y },
         carried,
       );
     };
+
+    /* Turning a page with a thumb.
+
+       On one page the library reads a drag twice over from where the finger
+       came down: which way it is headed, and where the fold should sit. Both
+       are wrong when the page fills the screen. A swipe leftward that began
+       on the left half was read as heading backward, so it did nothing at
+       all — and the fold snapped to wherever the thumb was rather than
+       starting at the page's edge, which on the left half is most of the way
+       turned already.
+
+       Drive it here instead. The direction is the one the thumb actually
+       moved, and the fold begins at the page's outer edge and follows the
+       thumb from there, so a short swipe is a short fold. Releasing turns the
+       page once it is a third of the way over, and a quick flick carries it
+       over from wherever it reached.
+
+       The synthesised x is in the flip engine's own units, where a forward
+       fold rests at pageWidth and a backward one at -pageWidth, both walking
+       toward 0 as the page comes over. */
+    let thumb = null;
+
+    els.bookWrap.addEventListener("touchstart", (e) => {
+      thumb = null;
+      if (e.touches.length !== 1 || state.tool || state.zoom > 1) return;
+      if (state.pf.getOrientation() !== "portrait") return;
+      if (e.target.closest && e.target.closest(".link-layer a")) return;
+      const box = (els.book.querySelector(".stf__block") || els.book).getBoundingClientRect();
+      const t = e.touches[0];
+      thumb = { x: t.clientX, at: t.clientX, top: box.top, time: Date.now(), folding: false };
+    }, true);
+
+    els.bookWrap.addEventListener("touchmove", (e) => {
+      if (!thumb || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - thumb.x;
+      if (!thumb.folding && Math.abs(dx) < 4) return;
+      thumb.folding = true;
+      thumb.at = t.clientX;
+      e.stopPropagation();          // the library must not fold it a second time
+      const r = state.pf.getRender().getRect();
+      flipper.fold({
+        x: dx < 0 ? r.pageWidth + dx : dx - r.pageWidth,
+        y: t.clientY - thumb.top,
+      });
+    }, true);
+
+    const thumbOff = (e) => {
+      if (!thumb) return;
+      const { folding, at, x, time } = thumb;
+      thumb = null;
+      if (!folding) return;
+      e.stopPropagation();
+      // A flick is a gesture in its own right: brief, and far enough to be
+      // meant. It does not have to reach the third of the way.
+      flicked = Date.now() - time < 300 && Math.abs(at - x) > 30;
+      flipper.stopMove();
+      flicked = false;
+    };
+    els.bookWrap.addEventListener("touchend", thumbOff, true);
+    els.bookWrap.addEventListener("touchcancel", thumbOff, true);
     if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
@@ -1109,7 +1171,7 @@
       y: (t[0].clientY + t[1].clientY) / 2,
     };
     hidePeek();
-  }, { passive: true });
+  }, { capture: true, passive: true });
 
   els.stage.addEventListener("touchmove", (e) => {
     if (!pinch || e.touches.length !== 2) return;
@@ -1122,11 +1184,11 @@
       (t[0].clientX + t[1].clientX) / 2,
       (t[0].clientY + t[1].clientY) / 2
     );
-  }, { passive: false });
+  }, { capture: true, passive: false });
 
   const endPinch = (e) => { if (!e.touches || e.touches.length < 2) pinch = null; };
-  els.stage.addEventListener("touchend", endPinch);
-  els.stage.addEventListener("touchcancel", endPinch);
+  els.stage.addEventListener("touchend", endPinch, true);
+  els.stage.addEventListener("touchcancel", endPinch, true);
 
   /* ══ Link preview ══════════════════════════════════════════════════════
      Hovering a link in the notebook shows a small card: a thumbnail of the
