@@ -526,6 +526,31 @@
         y: corner === "bottom" ? r.height - 2 : 1,
       });
     };
+
+    // A phone shows one page, and turning it forward was fiddly for two
+    // reasons that have nothing to do with each other.
+    //
+    // First, deciding which way a drag is headed. On a spread the library
+    // splits at the gutter, which is what anyone would expect. On a single
+    // page it splits at seven tenths of the way across, so only the right
+    // third of the page starts a forward turn and a drag begun anywhere else
+    // tried to go backward. Split a lone page down its middle instead.
+    const flipper = state.pf.getFlipController();
+    flipper.getDirectionByPoint = (p) => {
+      const r = flipper.getBoundsRect();
+      const back = state.pf.getOrientation() === "portrait"
+        ? p.x < r.pageWidth       // one page: its own centre line
+        : p.x < r.width / 2;      // a spread: the gutter, unchanged
+      return back ? 1 : 0;        // 1 back, 0 forward
+    };
+
+    // Second, the swipe. It had 250ms to finish or it was taken for the start
+    // of a slow drag — and a drag only turns the page if it is carried the
+    // whole width of the page, which on a phone is a long way to move a
+    // thumb. So an ordinary swipe did nothing at all: too slow to be a swipe,
+    // too short to be a drag. Give it time to be a swipe. This is read only
+    // by the touch handlers, so nothing about the mouse changes.
+    state.pf.getUI().swipeTimeout = 450;
     if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
