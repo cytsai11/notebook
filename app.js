@@ -32,7 +32,7 @@
     gridOverlay: $("gridOverlay"), pageGrid: $("pageGrid"),
     bookmarkPop: $("bookmarkPop"), bmHead: $("bmHead"), bmLabel: $("bmLabel"),
     bmColors: $("bmColors"),
-    toolHint: $("toolHint"), swatches: $("swatches"),
+    toolHint: $("toolHint"), swatches: $("swatches"), nibs: $("nibs"),
     zoomer: $("zoomer"), zoomLevel: $("zoomLevel"),
     scrim: $("scrim"), welcome: $("welcome"), helpModal: $("helpModal"),
     authorBar: $("authorBar"), authorBarText: $("authorBarText"),
@@ -56,6 +56,14 @@
     p: [{ c: "#d63b2f", n: "Red" }, { c: "#2456c4", n: "Blue" }, { c: "#1e242b", n: "Black" }],
   };
 
+  // How thick a stroke is, as a fraction of the page's width, so a mark keeps
+  // its weight whatever size the page is drawn at. Each stroke stores the one
+  // it was drawn with, so changing this never disturbs a mark already made.
+  const NIBS = {
+    h: [{ n: "Thin", w: 0.022, d: 6 }, { n: "Medium", w: 0.035, d: 9 }, { n: "Wide", w: 0.055, d: 13 }],
+    p: [{ n: "Fine", w: 0.0028, d: 3 }, { n: "Medium", w: 0.005, d: 5 }, { n: "Thick", w: 0.010, d: 8 }],
+  };
+
   const LS = {
     theme: "nb:theme", seen: "nb:seen", author: "nb:authormode", draft: "nb:authordraft",
     // Keyed by page count so a reader's marks survive a rebuild of the same
@@ -68,6 +76,7 @@
     pf: null, pages: [],
     tool: null,
     ink: { p: INKS.p[0].c, h: INKS.h[0].c },
+    nib: { p: NIBS.p[1].w, h: NIBS.h[1].w },
     marks: {}, undo: [], redo: [], text: [],
     mine: [],                     // personal bookmarks {page,label,color}
     author: [],                   // author bookmarks  {page,label,color}
@@ -1489,7 +1498,7 @@
         erased = [];
         eraseAt(pageIdx, pt, erased);
       } else {
-        stroke = { t: state.tool, c: state.ink[state.tool], w: state.tool === "h" ? 0.035 : 0.005, p: [pt] };
+        stroke = { t: state.tool, c: state.ink[state.tool], w: state.nib[state.tool], p: [pt] };
       }
     });
 
@@ -1656,9 +1665,12 @@
     // they read as that tool's colours rather than a stray row at the bottom.
     const host = state.tool === "h" ? toolBtns.h : state.tool === "p" ? toolBtns.p : null;
     els.swatches.hidden = !host;
+    els.nibs.hidden = !host;
     if (host) {
       host.insertAdjacentElement("afterend", els.swatches);
+      els.swatches.insertAdjacentElement("afterend", els.nibs);
       buildInkSwatches();
+      buildNibs();
     }
   }
 
@@ -1675,8 +1687,30 @@
       b.style.background = ink.c;
       b.setAttribute("aria-label", `${ink.n} ink`);
       b.setAttribute("aria-pressed", String(state.ink[kind] === ink.c));
-      b.addEventListener("click", () => { state.ink[kind] = ink.c; buildInkSwatches(); });
+      b.addEventListener("click", () => { state.ink[kind] = ink.c; buildInkSwatches(); buildNibs(); });
       els.swatches.appendChild(b);
+    }
+  }
+
+  // Each size is shown as the dot it draws, in the ink it will draw it with,
+  // so the choice is the thing itself rather than a word for it.
+  function buildNibs() {
+    const kind = state.tool === "h" ? "h" : "p";
+    els.nibs.innerHTML = "";
+    for (const nib of NIBS[kind]) {
+      const b = document.createElement("button");
+      b.className = "nib";
+      b.setAttribute("aria-label", `${nib.n} ${kind === "h" ? "highlighter" : "pen"}`);
+      b.setAttribute("aria-pressed", String(state.nib[kind] === nib.w));
+      b.dataset.peek = "tip";
+      b.dataset.tip = nib.n;
+      const dot = document.createElement("i");
+      dot.style.width = dot.style.height = `${nib.d}px`;
+      dot.style.background = state.ink[kind];
+      if (kind === "h") dot.style.opacity = ".55";
+      b.appendChild(dot);
+      b.addEventListener("click", () => { state.nib[kind] = nib.w; buildNibs(); });
+      els.nibs.appendChild(b);
     }
   }
 

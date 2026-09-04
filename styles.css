@@ -640,7 +640,8 @@ body.drawing .page-inner { cursor: crosshair; }
   padding: 2px 0 4px;
 }
 
-.rail-gap { flex: 1 1 auto; min-height: 12px; }
+/* Collapses first when a tool's colours and thicknesses are on show. */
+.rail-gap { flex: 1 1 auto; min-height: 4px; }
 
 /* Vertical tool buttons — icon over a real word, never an icon alone. */
 .rbtn {
@@ -681,8 +682,10 @@ body.drawing .page-inner { cursor: crosshair; }
 
 /* The rail is 82px wide with 8px padding, leaving 66px: three 18px circles
    with 5px gaps come to 64px, so they stay on one row instead of wrapping. */
-.rail .swatches { justify-content: center; gap: 5px; padding: 4px 0 6px; }
+.rail .swatches { justify-content: center; gap: 5px; padding: 3px 0 2px; }
 .rail .swatch { width: 18px; height: 18px; border-width: 2px; }
+.rail .nibs { gap: 4px; padding: 0 0 4px; }
+.rail .nib { width: 20px; height: 20px; }
 
 /* ── Scrub bar: the whole notebook, end to end ───────────────────────── */
 .scrubbar {
@@ -993,6 +996,36 @@ code {
   justify-content: center;
   gap: 5px;
   padding: 0 4px;
+}
+
+/* Stroke thickness, shown as the mark it makes rather than named. */
+.nibs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  padding: 2px 4px 4px;
+}
+
+.nib {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.nib i { display: block; border-radius: 50%; }
+.nib:hover { background: var(--panel-2); }
+
+.nib[aria-pressed="true"] {
+  background: var(--panel-2);
+  border-color: var(--acc);
 }
 
 .swatch {
@@ -1514,6 +1547,8 @@ kbd {
   .rbtn { padding: 9px 2px; }
   .rail { padding: 8px 4px; }
   .rail .swatches { gap: 4px; }
+  .rail .nibs { gap: 3px; }
+  .rail .nib { width: 18px; height: 18px; }
   .badge, #btnFullscreen { display: none; }
   .pbtn { padding: 0 12px; }
   .pbtn span { display: none; }
