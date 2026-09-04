@@ -406,6 +406,12 @@
   // page is actually drawn and costs a quarter of what the zoom image costs to
   // decode and hold. The zoom image is fetched only for the spread being
   // magnified, which is what stops a long read from getting heavier.
+  let sharpenTimer = null;
+  function sharpenSoon() {
+    clearTimeout(sharpenTimer);
+    sharpenTimer = setTimeout(sharpen, 180);
+  }
+
   function sharpen() {
     if (state.busy) return;             // never during a turn: that is the jank
     const cur = current();
@@ -940,7 +946,10 @@
     const r2 = els.zoomPad.getBoundingClientRect();
     els.stage.scrollLeft += (r2.left + fx * r2.width) - ax;
     els.stage.scrollTop += (r2.top + fy * r2.height) - ay;
-    sharpen();      // magnifying past the reading size calls for the big image
+    // Not on every frame of a pinch. Magnifying past the reading size swaps in
+    // the big image, and doing that while the page is still being scaled makes
+    // it blink — so wait until the fingers have settled.
+    sharpenSoon();
   }
 
   const zoomStep = (dir, x, y) => {

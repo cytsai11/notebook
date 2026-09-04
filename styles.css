@@ -1551,13 +1551,15 @@ kbd {
 
 /* ── Small screens ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  :root { --topbar-h: 56px; --rail-w: 64px; --scrub-h: 70px; }
+  /* 64px left a button 41px of room inside its padding and border, and
+     "Bookmarks" wants 49 of them — the word ran into the edge. */
+  :root { --topbar-h: 56px; --rail-w: 72px; --scrub-h: 70px; }
   .brand { flex: 0 1 auto; overflow: hidden; }
   .brand .titles { display: none; }
   .pager { flex: 1 1 auto; justify-content: center; min-width: 0; }
   .tbtn-label { display: none; }
   .tbtn { padding: 0 10px; }
-  .rbtn { font-size: 9.5px; padding: 7px 2px; }
+  .rbtn { font-size: 9px; padding: 7px 2px; }
   .rbtn svg { width: 18px; height: 18px; }
   /* The rail is now too narrow for three across, and a 2-then-1 wrap looks
      like an accident. Run both sets down it instead — there is height to
