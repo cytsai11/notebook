@@ -1071,6 +1071,7 @@
     // Re-dispatch so PageFlip re-measures the wrapper we just resized. A
     // timer, not requestAnimationFrame — rAF never fires while the tab is
     // hidden, which would leave `resizing` stuck on and the book blank.
+    buildTabs();          // marker spacing is measured in pixels
     resizing = true;
     setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
@@ -1650,10 +1651,13 @@
   }
 
   const toolBtns = { h: $("toolHighlight"), p: $("toolPen"), e: $("toolEraser") };
+  // Short enough to stay on a line or two on a phone, and no mention of a key
+  // a phone does not have. Esc still works; so does tapping the tool again,
+  // which is the obvious move when the button is lit.
   const HINTS = {
-    h: "Highlighter on — drag across the words you want to mark. Press Esc when you are done.",
-    p: "Pen on — drag on the page to write. Press Esc when you are done.",
-    e: "Eraser on — drag over a mark to remove it. Press Esc when you are done.",
+    h: "Highlighter on — drag across the words to mark them.",
+    p: "Pen on — drag on the page to write.",
+    e: "Eraser on — drag over a mark to remove it.",
   };
 
   function setTool(t) {
@@ -1796,9 +1800,23 @@
     const all = state.author.map((b) => [b, false]).concat(state.mine.map((b) => [b, true]));
     all.sort((x, y) => x[0].page - y[0].page);
 
+    // Bookmarks a few pages apart land a few pixels apart on a phone, where
+    // they pile into a heap nobody can hit. Hold each one a marker's width
+    // clear of the last, which moves it by a page or two at most — the bar is
+    // a map of the notebook, not a ruler.
+    const w = els.scrubTrack ? els.scrubTrack.clientWidth : 0;
+    const APART = 15;
+    let last = -Infinity;
+
     for (const [b, mine] of all) {
       if (b.page < 1 || b.page > state.pageCount) continue;
-      addMark(b, mine, spread.indexOf(b.page - 1) !== -1);
+      let pct = pageFraction(b.page - 1) * 100;
+      if (w > APART * 2) {
+        const x = Math.min(w, Math.max(pageFraction(b.page - 1) * w, last + APART));
+        last = x;
+        pct = (x / w) * 100;
+      }
+      addMark(b, mine, spread.indexOf(b.page - 1) !== -1, pct);
     }
   }
 
@@ -1807,10 +1825,10 @@
     return state.pageCount < 2 ? 0 : pageIdx / (state.pageCount - 1);
   }
 
-  function addMark(bm, isMine, here) {
+  function addMark(bm, isMine, here, pct) {
     const m = document.createElement("button");
     m.className = "mark" + (isMine ? " mine" : "") + (here ? " here" : "");
-    m.style.left = `${pageFraction(bm.page - 1) * 100}%`;
+    m.style.left = `${pct === undefined ? pageFraction(bm.page - 1) * 100 : pct}%`;
     m.dataset.peek = "page";
     m.dataset.page = String(bm.page - 1);
     m.setAttribute("aria-label", `${bm.label} — page ${bm.page}`);
