@@ -1072,6 +1072,7 @@
     // timer, not requestAnimationFrame — rAF never fires while the tab is
     // hidden, which would leave `resizing` stuck on and the book blank.
     buildTabs();          // marker spacing is measured in pixels
+    placeInkControls();   // the rail may have changed which way it runs
     resizing = true;
     setTimeout(() => {
       window.dispatchEvent(new Event("resize"));
@@ -1666,17 +1667,28 @@
     document.body.classList.toggle("drawing", !!state.tool);
     els.toolHint.hidden = !state.tool;
     if (state.tool) els.toolHint.textContent = HINTS[state.tool];
-    // Park the colours directly beneath whichever tool they belong to, so
-    // they read as that tool's colours rather than a stray row at the bottom.
+    placeInkControls();
+  }
+
+  // Beneath the tool while the rail stands on its side; at the end of the row
+  // when it lies along the bottom, where slotting them in beside the tool
+  // would split the run of buttons in two. Which of those applies changes when
+  // a phone is turned over, so this is re-run on a resize as well — otherwise
+  // rotating mid-annotation leaves the colours stranded where they were.
+  function placeInkControls() {
     const host = state.tool === "h" ? toolBtns.h : state.tool === "p" ? toolBtns.p : null;
     els.swatches.hidden = !host;
     els.nibs.hidden = !host;
-    if (host) {
+    if (!host) return;
+
+    if (matchMedia("(max-width: 620px)").matches) {
+      host.closest(".rail").append(els.swatches, els.nibs);
+    } else {
       host.insertAdjacentElement("afterend", els.swatches);
       els.swatches.insertAdjacentElement("afterend", els.nibs);
-      buildInkSwatches();
-      buildNibs();
     }
+    buildInkSwatches();
+    buildNibs();
   }
 
   toolBtns.h.addEventListener("click", () => setTool("h"));
