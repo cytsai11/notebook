@@ -685,7 +685,6 @@ body.drawing .page-inner { cursor: crosshair; }
 .rail .swatches { justify-content: center; gap: 5px; padding: 3px 0 2px; }
 .rail .swatch { width: 18px; height: 18px; border-width: 2px; }
 .rail .nibs { gap: 4px; padding: 0 0 4px; }
-.rail .nib { width: 20px; height: 20px; }
 
 /* ── Scrub bar: the whole notebook, end to end ───────────────────────── */
 .scrubbar {
@@ -998,29 +997,36 @@ code {
   padding: 0 4px;
 }
 
-/* Stroke thickness, shown as the mark it makes rather than named. */
+/* Stroke thickness, drawn as the stroke itself. Never wraps: three of these
+   breaking onto a second row read as a mistake rather than a set. */
 .nibs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 5px;
-  padding: 2px 4px 4px;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 2px 3px;
 }
 
 .nib {
   flex: none;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 17px;
   padding: 0;
   background: none;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
-.nib i { display: block; border-radius: 50%; }
+.nib i {
+  display: block;
+  width: 12px;
+  border-radius: 2px;
+}
+
 .nib:hover { background: var(--panel-2); }
 
 .nib[aria-pressed="true"] {
@@ -1537,6 +1543,11 @@ kbd {
   .tbtn { padding: 0 10px; }
   .rbtn { font-size: 9.5px; padding: 7px 2px; }
   .rbtn svg { width: 18px; height: 18px; }
+  /* The rail is now too narrow for three across, and a 2-then-1 wrap looks
+     like an accident. Run both sets down it instead — there is height to
+     spare, and a column of thicknesses reads as a scale. */
+  .rail .swatches,
+  .rail .nibs { flex-direction: column; flex-wrap: nowrap; gap: 4px; }
 }
 
 @media (max-width: 620px) {
@@ -1546,9 +1557,7 @@ kbd {
   .rbtn span, .rail-label { display: none; }
   .rbtn { padding: 9px 2px; }
   .rail { padding: 8px 4px; }
-  .rail .swatches { gap: 4px; }
-  .rail .nibs { gap: 3px; }
-  .rail .nib { width: 18px; height: 18px; }
+
   .badge, #btnFullscreen { display: none; }
   .pbtn { padding: 0 12px; }
   .pbtn span { display: none; }

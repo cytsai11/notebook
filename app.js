@@ -59,9 +59,10 @@
   // How thick a stroke is, as a fraction of the page's width, so a mark keeps
   // its weight whatever size the page is drawn at. Each stroke stores the one
   // it was drawn with, so changing this never disturbs a mark already made.
+  // `d` is how thick to draw the little sample, in pixels.
   const NIBS = {
-    h: [{ n: "Thin", w: 0.022, d: 6 }, { n: "Medium", w: 0.035, d: 9 }, { n: "Wide", w: 0.055, d: 13 }],
-    p: [{ n: "Fine", w: 0.0028, d: 3 }, { n: "Medium", w: 0.005, d: 5 }, { n: "Thick", w: 0.010, d: 8 }],
+    h: [{ n: "Thin", w: 0.022, d: 3 }, { n: "Medium", w: 0.035, d: 5 }, { n: "Wide", w: 0.055, d: 8 }],
+    p: [{ n: "Fine", w: 0.0028, d: 2 }, { n: "Medium", w: 0.005, d: 3 }, { n: "Thick", w: 0.010, d: 5 }],
   };
 
   const LS = {
@@ -1692,8 +1693,9 @@
     }
   }
 
-  // Each size is shown as the dot it draws, in the ink it will draw it with,
-  // so the choice is the thing itself rather than a word for it.
+  // Each size is a short stroke at that weight, in the ink it will draw with —
+  // the thing itself rather than a word for it. Strokes, not dots: a second
+  // row of circles under the colours would read as more colours.
   function buildNibs() {
     const kind = state.tool === "h" ? "h" : "p";
     els.nibs.innerHTML = "";
@@ -1704,11 +1706,11 @@
       b.setAttribute("aria-pressed", String(state.nib[kind] === nib.w));
       b.dataset.peek = "tip";
       b.dataset.tip = nib.n;
-      const dot = document.createElement("i");
-      dot.style.width = dot.style.height = `${nib.d}px`;
-      dot.style.background = state.ink[kind];
-      if (kind === "h") dot.style.opacity = ".55";
-      b.appendChild(dot);
+      const bar = document.createElement("i");
+      bar.style.height = `${nib.d}px`;
+      bar.style.background = state.ink[kind];
+      if (kind === "h") bar.style.opacity = ".55";
+      b.appendChild(bar);
       b.addEventListener("click", () => { state.nib[kind] = nib.w; buildNibs(); });
       els.nibs.appendChild(b);
     }
