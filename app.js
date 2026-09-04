@@ -544,13 +544,15 @@
       return back ? 1 : 0;        // 1 back, 0 forward
     };
 
-    // Second, the swipe. It had 250ms to finish or it was taken for the start
-    // of a slow drag — and a drag only turns the page if it is carried the
-    // whole width of the page, which on a phone is a long way to move a
-    // thumb. So an ordinary swipe did nothing at all: too slow to be a swipe,
-    // too short to be a drag. Give it time to be a swipe. This is read only
-    // by the touch handlers, so nothing about the mouse changes.
-    state.pf.getUI().swipeTimeout = 450;
+    // Second, how long a finger waits before the page answers it at all. One
+    // number does two jobs: it is how long a swipe may take and still count as
+    // a swipe, and it is how long a press waits before it becomes a page that
+    // can be dragged. Nothing moves under the finger until it has elapsed, so
+    // widening it to catch slower swipes buys the swipe at the cost of the
+    // drag. Keep it short: a gesture too slow to be a swipe is now a drag that
+    // turns the page a third of the way over, so both roads end in a turned
+    // page anyway. Touch only — the mouse never reads this.
+    state.pf.getUI().swipeTimeout = 120;
 
     // Third, how far a drag has to go before letting go turns the page. The
     // corner rests at the page's outer edge and the library only counts the
