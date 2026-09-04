@@ -932,20 +932,30 @@
     z = Math.min(ZOOMS[ZOOMS.length - 1], Math.max(ZOOMS[0], Math.round(z * 100) / 100));
     if (z === state.zoom) return;
 
-    const r = els.zoomPad.getBoundingClientRect();
-    const sr = els.stage.getBoundingClientRect();
-    const ax = anchorX == null ? sr.left + sr.width / 2 : anchorX;
-    const ay = anchorY == null ? sr.top + sr.height / 2 : anchorY;
-    const fx = r.width ? (ax - r.left) / r.width : 0.5;
-    const fy = r.height ? (ay - r.top) / r.height : 0.5;
+    const st = els.stage;
+    const pad = els.zoomPad;
+    const sr = st.getBoundingClientRect();
+    const ax = (anchorX == null ? sr.left + sr.width / 2 : anchorX) - sr.left;
+    const ay = (anchorY == null ? sr.top + sr.height / 2 : anchorY) - sr.top;
+
+    // Which point of the page is under the anchor, as a fraction of the pad —
+    // then put that same point back under it afterwards.
+    //
+    // Set outright, never nudged. A pinch is hundreds of small steps now, and
+    // a nudge that is a fraction of a pixel out on each of them, or clipped
+    // once against the ends of the scroll, walks the page across the screen a
+    // step at a time. Taken from layout rather than from screen rectangles,
+    // which already have the scroll folded into them.
+    const w0 = pad.offsetWidth, h0 = pad.offsetHeight;
+    const fx = w0 ? (st.scrollLeft + ax - pad.offsetLeft) / w0 : 0.5;
+    const fy = h0 ? (st.scrollTop + ay - pad.offsetTop) / h0 : 0.5;
 
     state.zoom = z;
     applyZoom();
     hidePeek();
 
-    const r2 = els.zoomPad.getBoundingClientRect();
-    els.stage.scrollLeft += (r2.left + fx * r2.width) - ax;
-    els.stage.scrollTop += (r2.top + fy * r2.height) - ay;
+    st.scrollLeft = fx * pad.offsetWidth + pad.offsetLeft - ax;
+    st.scrollTop = fy * pad.offsetHeight + pad.offsetTop - ay;
     // Not on every frame of a pinch. Magnifying past the reading size swaps in
     // the big image, and doing that while the page is still being scaled makes
     // it blink — so wait until the fingers have settled.
