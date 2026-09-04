@@ -539,41 +539,22 @@
     flipper.getDirectionByPoint = (p) => {
       const r = flipper.getBoundsRect();
 
-      // A thumb says which way it means to go by moving, and on one page that
-      // is the only honest signal there is: the whole sheet is under the
-      // thumb, so where it came down says nothing about where it is headed.
-      // This holds wherever the fold is being driven from, so a swipe cannot
-      // end up going the opposite way to the thumb that made it.
-      if (thumb && thumb.folding) return thumb.at < thumb.x ? 0 : 1;
       const back = state.pf.getOrientation() === "portrait"
         ? p.x < r.pageWidth       // one page: its own centre line
         : p.x < r.width / 2;      // a spread: the gutter, unchanged
       return back ? 1 : 0;        // 1 back, 0 forward
     };
 
-    // Second, how long a finger waits before the page answers it at all. One
-    // number does two jobs: it is how long a swipe may take and still count as
-    // a swipe, and it is how long a press waits before it becomes a page that
-    // can be dragged. Nothing moves under the finger until it has elapsed, so
-    // widening it to catch slower swipes buys the swipe at the cost of the
-    // drag. Keep it short: a gesture too slow to be a swipe is now a drag that
-    // turns the page a third of the way over, so both roads end in a turned
-    // page anyway. Touch only — the mouse never reads this.
+    // How long a press waits before it becomes a page that can be dragged.
+    // Touch only — the mouse never reads this.
     state.pf.getUI().swipeTimeout = 120;
 
-    // Third, how far a drag has to go before letting go turns the page. The
-    // corner rests at the page's outer edge and the library only counts the
-    // turn once it has been dragged to the far edge — a whole page width,
-    // which on a phone is most of the screen and more than a thumb can reach
-    // without letting go. Anything short of it springs back, so a real
-    // attempt to turn the page just undid itself.
-    //
-    // Let a third of the way across be enough. Past that the page carries on
-    // by itself, which is how paper behaves once it is far enough over.
-    const CARRY = 0.34;      // dragged with a mouse, which can cross the page
-    const THUMB = 0.20;      // pushed with a thumb, which has much less room
-    let flicked = false;     // ...unless it was flicked, which counts on its own
-    let thumbing = false;    // whether the gesture in hand is a thumb's
+    // How far a page has to be dragged before letting go turns it. The corner
+    // rests at the page's outer edge and the library only counted the turn
+    // once it had been dragged the whole width of the page, so anything short
+    // of that sprang back. A third of the way is enough; past that the page
+    // carries on by itself, which is how paper behaves.
+    const CARRY = 0.34;
 
     flipper.stopMove = () => {
       const calc = flipper.getCalculation();
@@ -581,8 +562,7 @@
       const at = calc.getPosition();
       const r = flipper.getBoundsRect();
       const y = calc.getCorner() === "bottom" ? r.height : 0;
-      const need = thumbing ? THUMB : CARRY;
-      const carried = flicked || at.x <= r.pageWidth * (1 - need);
+      const carried = at.x <= r.pageWidth * (1 - CARRY);
       flipper.animateFlippingTo(
         at,
         { x: carried ? -r.pageWidth : r.pageWidth, y },
@@ -590,74 +570,96 @@
       );
     };
 
-    /* Turning a page with a thumb.
+    /* ── On a phone a page is a card, not a sheet of paper ────────────────
 
-       On one page the library reads a drag twice over from where the finger
-       came down: which way it is headed, and where the fold should sit. Both
-       are wrong when the page fills the screen. A swipe leftward that began
-       on the left half was read as heading backward, so it did nothing at
-       all — and the fold snapped to wherever the thumb was rather than
-       starting at the page's edge, which on the left half is most of the way
-       turned already.
+       Curling a corner is a mouse gesture. It needs somewhere to take hold
+       and room to carry the page across, and a thumb on a page that fills the
+       screen has neither — which is what every attempt to make it work here
+       kept running into.
 
-       Drive it here instead. The direction is the one the thumb actually
-       moved, and the fold begins at the page's outer edge and follows the
-       thumb from there, so a short swipe is a short fold. Releasing turns the
-       page once it is a third of the way over, and a quick flick carries it
-       over from wherever it reached.
+       So on one page, drop the fold. The page slides with the thumb and is
+       thrown off the side, and the next one comes in behind it. There is
+       nothing to aim at: anywhere on the page will do, and the direction is
+       simply the way the thumb went. The spread on a wider screen keeps its
+       fold, where there is a corner to reach for and a mouse to reach with. */
+    const CARD_OUT = 190;    // ms to throw the page off
+    const CARD_IN = 230;     // ms to bring the next one on
+    const CARD_FAR = 0.22;   // of the page, past which letting go turns it
 
-       The synthesised x is in the flip engine's own units, where a forward
-       fold rests at pageWidth and a backward one at -pageWidth, both walking
-       toward 0 as the page comes over. */
-    let thumb = null;
+    let card = null;
+
+    function cardAt(dx, ms) {
+      const el = els.book;
+      el.style.transition = ms
+        ? `transform ${ms}ms cubic-bezier(.22,.61,.36,1), opacity ${ms}ms ease`
+        : "none";
+      if (!dx) { el.style.transform = ""; el.style.opacity = ""; return; }
+      // A touch of rotation and fade as it leaves, so it reads as being
+      // thrown rather than nudged off the edge.
+      el.style.transform = `translateX(${Math.round(dx)}px) rotate(${(dx * 0.018).toFixed(2)}deg)`;
+      el.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / (innerWidth * 1.4)));
+    }
+
+    function cardTurn(forward) {
+      const to = current() + (forward ? 1 : -1);
+      if (to < 0 || to >= state.pageCount) { cardAt(0, CARD_IN); return; }
+
+      const off = Math.round((innerWidth || 400) * 1.05);
+      cardAt(forward ? -off : off, CARD_OUT);
+      setTimeout(() => {
+        goTo(to, true);               // swap outright: the slide is the animation
+        cardAt(forward ? off : -off, 0);
+        void els.book.offsetWidth;    // let that land before it is animated away
+        cardAt(0, CARD_IN);
+        setTimeout(() => { els.book.style.transition = ""; }, CARD_IN + 60);
+      }, CARD_OUT);
+    }
+
+    const cardable = (e) =>
+      e.touches.length === 1 && !state.tool && state.zoom <= 1 &&
+      state.pf.getOrientation() === "portrait" &&
+      !(e.target.closest && e.target.closest(".link-layer a"));
 
     els.bookWrap.addEventListener("touchstart", (e) => {
-      thumb = null;
-      if (e.touches.length !== 1 || state.tool || state.zoom > 1) return;
-      if (state.pf.getOrientation() !== "portrait") return;
-      if (e.target.closest && e.target.closest(".link-layer a")) return;
-      const box = (els.book.querySelector(".stf__block") || els.book).getBoundingClientRect();
+      // A second finger is the beginning of a pinch, not the rest of a swipe.
+      if (card) { cardAt(0, CARD_IN); card = null; }
+      if (!cardable(e)) return;
       const t = e.touches[0];
-      thumb = { x: t.clientX, y: t.clientY, at: t.clientX,
-                top: box.top, time: Date.now(), folding: false };
+      card = { x: t.clientX, y: t.clientY, at: t.clientX, w: els.book.offsetWidth,
+               time: Date.now(), moving: false };
+      e.stopPropagation();      // no fold, ever: the engine never sees this
     }, true);
 
     els.bookWrap.addEventListener("touchmove", (e) => {
-      if (!thumb || e.touches.length !== 1) return;
+      if (!card) return;
+      if (e.touches.length !== 1) { cardAt(0, CARD_IN); card = null; return; }
       const t = e.touches[0];
-      const dx = t.clientX - thumb.x;
-      if (!thumb.folding) {
+      const dx = t.clientX - card.x;
+      if (!card.moving) {
         if (Math.abs(dx) < 4) return;
         // Going up or down the page is not an attempt to turn it.
-        if (Math.abs(t.clientY - thumb.y) > Math.abs(dx)) return;
-        thumb.folding = true;
+        if (Math.abs(t.clientY - card.y) > Math.abs(dx)) { card = null; return; }
+        card.moving = true;
       }
-      thumb.at = t.clientX;
-      e.stopPropagation();          // the library must not fold it a second time
-      const r = state.pf.getRender().getRect();
-      flipper.fold({
-        x: dx < 0 ? r.pageWidth + dx : dx - r.pageWidth,
-        y: t.clientY - thumb.top,
-      });
+      card.at = t.clientX;
+      e.stopPropagation();
+      cardAt(dx, 0);
     }, true);
 
-    const thumbOff = (e) => {
-      if (!thumb) return;
-      const { folding, at, x, time } = thumb;
-      thumb = null;
-      if (!folding) return;
+    const cardDrop = (e) => {
+      if (!card) return;
+      const { moving, at, x, time, w } = card;
+      card = null;
+      if (!moving) return;
       e.stopPropagation();
-      // A flick is a gesture in its own right, and turns the page from
-      // wherever it reached. The window has to cover an ordinary swipe, which
-      // takes far longer than it feels like it does — nearer half a second
-      // than a tenth.
-      flicked = Date.now() - time < 600 && Math.abs(at - x) > 24;
-      thumbing = true;
-      flipper.stopMove();
-      flicked = thumbing = false;
+      const dx = at - x;
+      // Far enough to be meant, or quick enough to be a flick.
+      const far = Math.abs(dx) > (w || 300) * CARD_FAR;
+      const flick = Date.now() - time < 600 && Math.abs(dx) > 24;
+      if (far || flick) cardTurn(dx < 0); else cardAt(0, CARD_IN);
     };
-    els.bookWrap.addEventListener("touchend", thumbOff, true);
-    els.bookWrap.addEventListener("touchcancel", thumbOff, true);
+    els.bookWrap.addEventListener("touchend", cardDrop, true);
+    els.bookWrap.addEventListener("touchcancel", cardDrop, true);
     if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
