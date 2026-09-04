@@ -551,6 +551,31 @@
     // too short to be a drag. Give it time to be a swipe. This is read only
     // by the touch handlers, so nothing about the mouse changes.
     state.pf.getUI().swipeTimeout = 450;
+
+    // Third, how far a drag has to go before letting go turns the page. The
+    // corner rests at the page's outer edge and the library only counts the
+    // turn once it has been dragged to the far edge — a whole page width,
+    // which on a phone is most of the screen and more than a thumb can reach
+    // without letting go. Anything short of it springs back, so a real
+    // attempt to turn the page just undid itself.
+    //
+    // Let a third of the way across be enough. Past that the page carries on
+    // by itself, which is how paper behaves once it is far enough over.
+    const CARRY = 0.34;      // of the page, before the turn is taken as meant
+
+    flipper.stopMove = () => {
+      const calc = flipper.getCalculation();
+      if (!calc) return;
+      const at = calc.getPosition();
+      const r = flipper.getBoundsRect();
+      const y = calc.getCorner() === "bottom" ? r.height : 0;
+      const carried = at.x <= r.pageWidth * (1 - CARRY);
+      flipper.animateFlippingTo(
+        at,
+        { x: carried ? -r.pageWidth : r.pageWidth, y },
+        carried,
+      );
+    };
     if (startPage) state.pf.turnToPage(startPage);   // some builds ignore startPage
     state.pf.on("flip", (e) => syncUI(e.data));
 
