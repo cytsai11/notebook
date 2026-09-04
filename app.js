@@ -2208,8 +2208,12 @@
     }
   });
 
+  // Pressing away from a panel closes it — but not on the rail that opened it,
+  // or the button's own press would shut the panel a moment before its click
+  // could toggle it, and pressing Bookmarks twice would open it twice over.
+  // (.toolbar was the bottom bar these buttons sat on before the rails.)
   document.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".panel, .pop, .overlay, .modal, .toolbar, .topbar")) return;
+    if (e.target.closest(".panel, .pop, .overlay, .modal, .rail, .topbar")) return;
     closeFloaters();
   });
 
