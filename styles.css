@@ -1005,6 +1005,10 @@ code {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  /* Both, because the rail stands these in a column: justify-content centres
+     along the main axis, which turns vertical when it does, leaving nothing
+     to centre them across the rail. */
+  align-items: center;
   gap: 5px;
   padding: 0 4px;
 }
