@@ -1579,9 +1579,11 @@ kbd {
      had to drop when they were 46px wide. */
   :root { --rail-w: 0px; }
 
+  /* Finding your way sits above the page, marking it up below — the same
+     order as the two rails had, read top to bottom instead of left to right. */
   .workspace { flex-direction: column; }
-  .stage { order: 0; }
-  .rail-left { order: 1; }
+  .rail-left { order: 0; }
+  .stage { order: 1; }
   .rail-right { order: 2; }
 
   .rail {
@@ -1596,17 +1598,28 @@ kbd {
     overflow: visible;
   }
 
-  .rail-left { border-right: none; border-top: 1px solid var(--line); }
+  .rail-left { border-right: none; border-bottom: 1px solid var(--line); }
   .rail-right { border-left: none; border-top: 1px solid var(--line); }
   .rail-gap, .rail-label { display: none; }
 
-  .rbtn { flex: 0 0 auto; min-width: 54px; padding: 5px 4px; }
-  .rbtn span { display: block; font-size: 9.5px; }
+  /* Seven across has to fit the narrowest phone, so they share the row out
+     between them rather than each claiming a width — a fixed 54px each
+     overflowed a 390px screen and dropped Bookmark onto a row of its own. */
+  .rbtn { flex: 1 1 auto; min-width: 40px; max-width: 90px; padding: 5px 2px; }
+  .rbtn span { display: block; font-size: 9px; white-space: nowrap; }
 
   /* Colours and thicknesses are appended to the end of the row rather than
      wedged in beside the tool, which would break the run of buttons apart. */
   .rail .swatches,
   .rail .nibs { flex-direction: row; flex-wrap: nowrap; }
+
+  .ink-row {
+    flex: 0 0 100%;          /* a line of its own, under the tools */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 2px;
+  }
   .rail .swatches { padding: 0 2px; }
   /* Same air as when they stand in a column, so the two stay two questions. */
   .rail .nibs { padding: 0 2px 0 14px; }

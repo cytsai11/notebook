@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=89">
+<link rel="stylesheet" href="styles.css?v=91">
 </head>
 <body>
 
@@ -142,6 +142,9 @@
     </button>
     <div class="swatches" id="swatches" hidden></div>
     <div class="nibs" id="nibs" hidden></div>
+    <!-- Holds the two together on a line of their own when the rail lies
+         along the bottom; unused while it stands on its side. -->
+    <div class="ink-row" id="inkRow" hidden></div>
     <button class="rbtn" id="btnUndo">
       <svg viewBox="0 0 24 24"><path d="M4 9h9a6 6 0 0 1 0 12H8M4 9l4-4M4 9l4 4"/></svg>
       <span>Undo</span>
@@ -290,7 +293,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
-<script src="config.js?v=89"></script>
-<script src="app.js?v=89"></script>
+<script src="config.js?v=91"></script>
+<script src="app.js?v=91"></script>
 </body>
 </html>

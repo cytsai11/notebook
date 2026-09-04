@@ -33,6 +33,7 @@
     bookmarkPop: $("bookmarkPop"), bmHead: $("bmHead"), bmLabel: $("bmLabel"),
     bmColors: $("bmColors"),
     toolHint: $("toolHint"), swatches: $("swatches"), nibs: $("nibs"),
+    inkRow: $("inkRow"),
     zoomer: $("zoomer"), zoomLevel: $("zoomLevel"),
     scrim: $("scrim"), welcome: $("welcome"), helpModal: $("helpModal"),
     authorBar: $("authorBar"), authorBarText: $("authorBarText"),
@@ -1681,8 +1682,13 @@
     els.nibs.hidden = !host;
     if (!host) return;
 
-    if (matchMedia("(max-width: 620px)").matches) {
-      host.closest(".rail").append(els.swatches, els.nibs);
+    const acrossTheBottom = matchMedia("(max-width: 620px)").matches;
+    els.inkRow.hidden = !acrossTheBottom;
+    if (acrossTheBottom) {
+      // Both into one box, which takes a whole line — otherwise the buttons
+      // give up width to make room for the colours beside them.
+      els.inkRow.append(els.swatches, els.nibs);
+      host.closest(".rail").append(els.inkRow);
     } else {
       host.insertAdjacentElement("afterend", els.swatches);
       els.swatches.insertAdjacentElement("afterend", els.nibs);
