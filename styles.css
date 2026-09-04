@@ -50,6 +50,11 @@ html[data-theme="dark"] {
 html, body {
   height: 100%;
   margin: 0;
+  /* A swipe to the right is the browser's own gesture for going back a page,
+     which is why turning back a page by thumb never worked while turning
+     forward did. Nothing here overscrolls, so no gesture of ours should be
+     read as one. */
+  overscroll-behavior: none;
 }
 
 body {
@@ -346,6 +351,11 @@ body.drawing .pan-catch { display: none !important; }
 .book-wrap {
   position: relative;
   transform-origin: 0 0;
+  /* Every touch on the book is a page turn or a pinch, and both are ours to
+     handle. Without this the browser claims the horizontal ones first — and
+     it only claims one direction, so pages would turn forward but not back.
+     Panning while zoomed is unaffected: .pan-catch covers the book then. */
+  touch-action: none;
 }
 
 /* The re-centring slide when the book opens or closes. Only applied while
