@@ -563,8 +563,10 @@
     //
     // Let a third of the way across be enough. Past that the page carries on
     // by itself, which is how paper behaves once it is far enough over.
-    const CARRY = 0.34;      // of the page, before the turn is taken as meant
+    const CARRY = 0.34;      // dragged with a mouse, which can cross the page
+    const THUMB = 0.20;      // pushed with a thumb, which has much less room
     let flicked = false;     // ...unless it was flicked, which counts on its own
+    let thumbing = false;    // whether the gesture in hand is a thumb's
 
     flipper.stopMove = () => {
       const calc = flipper.getCalculation();
@@ -572,7 +574,8 @@
       const at = calc.getPosition();
       const r = flipper.getBoundsRect();
       const y = calc.getCorner() === "bottom" ? r.height : 0;
-      const carried = flicked || at.x <= r.pageWidth * (1 - CARRY);
+      const need = thumbing ? THUMB : CARRY;
+      const carried = flicked || at.x <= r.pageWidth * (1 - need);
       flipper.animateFlippingTo(
         at,
         { x: carried ? -r.pageWidth : r.pageWidth, y },
@@ -608,15 +611,20 @@
       if (e.target.closest && e.target.closest(".link-layer a")) return;
       const box = (els.book.querySelector(".stf__block") || els.book).getBoundingClientRect();
       const t = e.touches[0];
-      thumb = { x: t.clientX, at: t.clientX, top: box.top, time: Date.now(), folding: false };
+      thumb = { x: t.clientX, y: t.clientY, at: t.clientX,
+                top: box.top, time: Date.now(), folding: false };
     }, true);
 
     els.bookWrap.addEventListener("touchmove", (e) => {
       if (!thumb || e.touches.length !== 1) return;
       const t = e.touches[0];
       const dx = t.clientX - thumb.x;
-      if (!thumb.folding && Math.abs(dx) < 4) return;
-      thumb.folding = true;
+      if (!thumb.folding) {
+        if (Math.abs(dx) < 4) return;
+        // Going up or down the page is not an attempt to turn it.
+        if (Math.abs(t.clientY - thumb.y) > Math.abs(dx)) return;
+        thumb.folding = true;
+      }
       thumb.at = t.clientX;
       e.stopPropagation();          // the library must not fold it a second time
       const r = state.pf.getRender().getRect();
@@ -632,11 +640,14 @@
       thumb = null;
       if (!folding) return;
       e.stopPropagation();
-      // A flick is a gesture in its own right: brief, and far enough to be
-      // meant. It does not have to reach the third of the way.
-      flicked = Date.now() - time < 300 && Math.abs(at - x) > 30;
+      // A flick is a gesture in its own right, and turns the page from
+      // wherever it reached. The window has to cover an ordinary swipe, which
+      // takes far longer than it feels like it does — nearer half a second
+      // than a tenth.
+      flicked = Date.now() - time < 600 && Math.abs(at - x) > 24;
+      thumbing = true;
       flipper.stopMove();
-      flicked = false;
+      flicked = thumbing = false;
     };
     els.bookWrap.addEventListener("touchend", thumbOff, true);
     els.bookWrap.addEventListener("touchcancel", thumbOff, true);
