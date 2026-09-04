@@ -709,13 +709,23 @@
     // the stage, and bookmarks moved to the scrub bar.
     const availW = els.stage.clientWidth - (wide ? 130 : 20);
     const availH = els.stage.clientHeight - 64;
-    // Ask the flip engine whether it is showing one page or two rather than
-    // guessing from width — guessing let the two disagree, which left the
-    // cover uncentred on narrow screens.
-    const portrait = state.pf
-      ? state.pf.getOrientation() === "portrait"
-      : els.stage.clientWidth < 640;
-    const spreadRatio = state.ratio * (portrait ? 1 : 2);
+
+    // One page or two, decided by the shape of the space rather than its
+    // width. A phone held upright and a tablet held upright both want one
+    // page though one is twice the width of the other, and both want two the
+    // moment they are turned on their side. The engine decides by width
+    // alone, which is why the two devices disagreed, so decide it here and
+    // tell the engine outright: usePortrait off and it never splits to a
+    // single page, a minWidth nothing can reach and it always does. minWidth
+    // is read for nothing else.
+    const single = els.stage.clientHeight > els.stage.clientWidth;
+    if (state.pf) {
+      const cfg = state.pf.getSettings();
+      cfg.usePortrait = single;
+      cfg.minWidth = single ? 1e6 : 200;
+      if ((state.pf.getOrientation() === "portrait") !== single) state.pf.update();
+    }
+    const spreadRatio = state.ratio * (single ? 1 : 2);
 
     let h = availH, w = h * spreadRatio;
     if (w > availW) { w = availW; h = w / spreadRatio; }
@@ -1040,6 +1050,11 @@
   }
 
   let resizing = false;
+  // Turning a phone over is the one moment the page count changes, and some
+  // browsers report the new size a beat after saying they have rotated.
+  window.addEventListener("orientationchange", () => {
+    setTimeout(() => window.dispatchEvent(new Event("resize")), 120);
+  });
   window.addEventListener("resize", () => {
     if (resizing || !state.pf) return;
     computeFit();
@@ -2162,6 +2177,12 @@
     scrubPeek(e.clientX);
   });
 
+  // The slider itself is a thin strip along the very bottom of the screen,
+  // which on a phone is where the system watches for its own gestures — so a
+  // drag there often never reaches the page at all. Let the whole bar do the
+  // job instead: it is the height of a comfortable thumb, and well clear of
+  // the edge.
+
   els.scrubTrack.addEventListener("pointerleave", () => {
     if (scrubbing) return;            // the pointer may stray off the bar mid-drag
     scrubIdx = -1;
@@ -2170,8 +2191,10 @@
 
   window.addEventListener("pointerup", () => {
     if (!scrubbing) return;
+    const to = scrubIdx;
     endScrub();
     hidePeek();                       // the page it named is the page now open
+    if (to >= 0) goTo(to, Math.abs(to - current()) > 8);
   });
   window.addEventListener("pointercancel", () => { endScrub(); hidePeek(); });
 

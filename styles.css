@@ -687,7 +687,10 @@ body.drawing .page-inner { cursor: crosshair; }
 /* ── Scrub bar: the whole notebook, end to end ───────────────────────── */
 .scrubbar {
   flex: none;
-  height: var(--scrub-h);
+  /* Keep the bar out of the strip along the bottom of a phone where the
+     system takes its own gestures, or a drag on it never arrives. */
+  height: calc(var(--scrub-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -803,6 +806,9 @@ body.drawing .page-inner { cursor: crosshair; }
 /* The range input covers the whole track so anywhere is draggable. */
 #pageSlider {
   position: absolute;
+  /* Without this a drag along it reads as an attempt to pan the page, and
+     the browser takes the gesture before the slider sees it. */
+  touch-action: none;
   z-index: 1;
   left: 0;
   right: 0;
