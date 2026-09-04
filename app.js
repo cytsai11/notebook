@@ -1012,8 +1012,22 @@
     panTo = null;
   }
 
-  function movePan(e) {
+  // A pinch arrives as pointer events too, so the first finger down starts a
+  // drag and every finger that moves afterwards is read as one — from a scroll
+  // position taken before the zoom began. Two fingers opening look like an
+  // enormous drag, which threw the page to one end and let the next frame of
+  // the zoom snap it back. A second finger means this was never a drag.
+  function cancelPan() {
     if (!pan) return;
+    if (panFrame) { cancelAnimationFrame(panFrame); panFrame = 0; }
+    panTo = null;
+    pan = null;
+    state.panning = false;
+    els.stage.classList.remove("grabbing");
+  }
+
+  function movePan(e) {
+    if (!pan || pinch) return;
     const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
     pan.moved = Math.max(pan.moved, Math.hypot(dx, dy));
     panTo = { l: pan.sl - dx, t: pan.st - dy };
@@ -1031,7 +1045,7 @@
   }
 
   panCatch.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;   // middle button bubbles to the stage handler
+    if (e.button !== 0 || pinch) return;   // middle button bubbles to the stage
     startPan(panCatch, e, true);
   });
   panCatch.addEventListener("pointermove", movePan);
@@ -1230,6 +1244,7 @@
 
   els.stage.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 2) return;
+    cancelPan();          // whatever the first finger began, it was not a drag
     pinch = { last: spread([e.touches[0], e.touches[1]]), target: state.zoom };
     hidePeek();
   }, { capture: true, passive: true });
