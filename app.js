@@ -538,6 +538,13 @@
     const flipper = state.pf.getFlipController();
     flipper.getDirectionByPoint = (p) => {
       const r = flipper.getBoundsRect();
+
+      // A thumb says which way it means to go by moving, and on one page that
+      // is the only honest signal there is: the whole sheet is under the
+      // thumb, so where it came down says nothing about where it is headed.
+      // This holds wherever the fold is being driven from, so a swipe cannot
+      // end up going the opposite way to the thumb that made it.
+      if (thumb && thumb.folding) return thumb.at < thumb.x ? 0 : 1;
       const back = state.pf.getOrientation() === "portrait"
         ? p.x < r.pageWidth       // one page: its own centre line
         : p.x < r.width / 2;      // a spread: the gutter, unchanged
