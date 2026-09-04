@@ -1220,24 +1220,40 @@
 
   els.stage.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 2) return;
-    const t = [e.touches[0], e.touches[1]];
-    pinch = {
-      from: spread(t),
-      zoom: state.zoom,
-      x: (t[0].clientX + t[1].clientX) / 2,
-      y: (t[0].clientY + t[1].clientY) / 2,
-    };
+    pinch = { last: spread([e.touches[0], e.touches[1]]), target: state.zoom };
     hidePeek();
   }, { capture: true, passive: true });
 
+  /* The zoom follows the fingers frame by frame rather than being worked out
+     against how far apart they were when they landed.
+
+     Measuring from that first reading meant one bad reading ruined the whole
+     gesture: two fingers are reported as one point for an instant as they
+     arrive, and a first spread of a few pixels turns any ordinary pinch into a
+     multiple of ten. Worse, the running total was never bounded, so once it
+     passed 400% the fingers could move without anything happening — the zoom
+     sat pinned at the ceiling until the total fell back under it, and then
+     dropped away all at once.
+
+     Stepping instead means there is no first reading to get wrong, and the
+     total is kept inside the range, so coming back down answers immediately. */
   els.stage.addEventListener("touchmove", (e) => {
     if (!pinch || e.touches.length !== 2) return;
     e.preventDefault();                       // no browser page zoom as well
     const t = [e.touches[0], e.touches[1]];
     const now = spread(t);
-    if (!pinch.from || !now) return;
+    if (!now || !pinch.last) return;
+
+    const step = now / pinch.last;
+    pinch.last = now;
+    // One frame of a pinch does not multiply the zoom. Anything wilder than
+    // this is the touch stream settling, not a hand moving.
+    if (!(step > 0.7 && step < 1.4)) return;
+
+    const most = ZOOMS[ZOOMS.length - 1], least = ZOOMS[0];
+    pinch.target = Math.min(most, Math.max(least, pinch.target * step));
     setZoom(
-      pinch.zoom * (now / pinch.from),
+      pinch.target,
       (t[0].clientX + t[1].clientX) / 2,
       (t[0].clientY + t[1].clientY) / 2
     );
