@@ -1624,7 +1624,9 @@ kbd {
   /* Same air as when they stand in a column, so the two stay two questions. */
   .rail .nibs { padding: 0 2px 0 14px; }
 
-  .badge, #btnFullscreen { display: none; }
+  /* Pinching is how you zoom a phone, so the control is a button floating
+     over the page for no reason. */
+  .badge, #btnFullscreen, .zoomer { display: none; }
   .pbtn { padding: 0 12px; }
   .pbtn span { display: none; }
   .scrubbar { padding: 0 10px; gap: 8px; }
