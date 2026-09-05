@@ -648,10 +648,20 @@
       peeks.next.hidden = true;
     }
 
-    function cardAt(dx, ms) {
+    // A little tilt as it goes, which is half of what makes this feel like
+    // something being handled rather than a screen changing. The neighbours
+    // ride inside the book, so they lean with it and the strip stays one
+    // piece. Capped, or a long carry would put the page on its ear.
+    const TILT = 0.018, TILT_MAX = 4;
+
+    function cardAt(dx, ms, deg) {
       const el = els.book;
       el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.22,.61,.36,1)` : "none";
-      el.style.transform = dx ? `translateX(${Math.round(dx)}px)` : "";
+      const tilt = deg === undefined
+        ? Math.max(-TILT_MAX, Math.min(TILT_MAX, dx * TILT))
+        : deg;
+      if (!dx && !tilt && !ms) { el.style.transform = ""; return; }
+      el.style.transform = `translateX(${Math.round(dx)}px) rotate(${tilt.toFixed(2)}deg)`;
     }
 
     // Settle back where it was, then put the neighbours away again.
@@ -669,7 +679,9 @@
       // becomes the page itself and everything drops back to nothing, with no
       // animation to give the swap away.
       const stride = els.book.offsetWidth + PEEK_GAP;
-      cardAt(forward ? -stride : stride, CARD_OUT);
+      // Straightens as it travels, so the page it hands over to arrives level
+      // and there is no tilt left to snap away at the swap.
+      cardAt(forward ? -stride : stride, CARD_OUT, 0);
       setTimeout(() => {
         goTo(to, true);
         hideNeighbours();
