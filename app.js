@@ -605,30 +605,76 @@
 
     let card = null;
 
+    // The pages on either side, waiting just off the edges of the screen. They
+    // sit inside the book, so whatever carries the book carries them too, and
+    // a swipe shows the edge of what is coming rather than a bare background.
+    const PEEK_GAP = 10;
+    let peeks = null;
+
+    function neighbours() {
+      if (peeks) return peeks;
+      const make = (side) => {
+        const d = document.createElement("div");
+        d.className = `card-peek ${side}`;
+        d.hidden = true;
+        const im = document.createElement("img");
+        im.alt = "";
+        im.decoding = "async";
+        d.appendChild(im);
+        els.book.appendChild(d);
+        return d;
+      };
+      peeks = { prev: make("prev"), next: make("next") };
+      return peeks;
+    }
+
+    function showNeighbours() {
+      const p = neighbours();
+      const here = current();
+      const put = (el, i) => {
+        if (i < 0 || i >= state.pageCount) { el.hidden = true; return; }
+        const im = el.firstElementChild;
+        const src = readUrl(i);
+        if (im.getAttribute("src") !== src) im.src = src;
+        el.hidden = false;
+      };
+      put(p.prev, here - 1);
+      put(p.next, here + 1);
+    }
+
+    function hideNeighbours() {
+      if (!peeks) return;
+      peeks.prev.hidden = true;
+      peeks.next.hidden = true;
+    }
+
     function cardAt(dx, ms) {
       const el = els.book;
-      el.style.transition = ms
-        ? `transform ${ms}ms cubic-bezier(.22,.61,.36,1), opacity ${ms}ms ease`
-        : "none";
-      if (!dx) { el.style.transform = ""; el.style.opacity = ""; return; }
-      // A touch of rotation and fade as it leaves, so it reads as being
-      // thrown rather than nudged off the edge.
-      el.style.transform = `translateX(${Math.round(dx)}px) rotate(${(dx * 0.018).toFixed(2)}deg)`;
-      el.style.opacity = String(Math.max(0.4, 1 - Math.abs(dx) / (innerWidth * 1.4)));
+      el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.22,.61,.36,1)` : "none";
+      el.style.transform = dx ? `translateX(${Math.round(dx)}px)` : "";
+    }
+
+    // Settle back where it was, then put the neighbours away again.
+    function cardHome() {
+      cardAt(0, CARD_IN);
+      setTimeout(() => { hideNeighbours(); els.book.style.transition = ""; }, CARD_IN + 40);
     }
 
     function cardTurn(forward) {
       const to = current() + (forward ? 1 : -1);
-      if (to < 0 || to >= state.pageCount) { cardAt(0, CARD_IN); return; }
+      if (to < 0 || to >= state.pageCount) { cardHome(); return; }
 
-      const off = Math.round((innerWidth || 400) * 1.05);
-      cardAt(forward ? -off : off, CARD_OUT);
+      // Carry it exactly one page along, so the neighbour that was showing at
+      // the edge arrives square in the middle. Then the page underneath
+      // becomes the page itself and everything drops back to nothing, with no
+      // animation to give the swap away.
+      const stride = els.book.offsetWidth + PEEK_GAP;
+      cardAt(forward ? -stride : stride, CARD_OUT);
       setTimeout(() => {
-        goTo(to, true);               // swap outright: the slide is the animation
-        cardAt(forward ? off : -off, 0);
-        void els.book.offsetWidth;    // let that land before it is animated away
-        cardAt(0, CARD_IN);
-        setTimeout(() => { els.book.style.transition = ""; }, CARD_IN + 60);
+        goTo(to, true);
+        hideNeighbours();
+        cardAt(0, 0);
+        setTimeout(() => { els.book.style.transition = ""; }, 30);
       }, CARD_OUT);
     }
 
@@ -639,17 +685,18 @@
 
     els.bookWrap.addEventListener("touchstart", (e) => {
       // A second finger is the beginning of a pinch, not the rest of a swipe.
-      if (card) { cardAt(0, CARD_IN); card = null; }
+      if (card) { card = null; cardHome(); }
       if (!cardable(e)) return;
       const t = e.touches[0];
       card = { x: t.clientX, y: t.clientY, at: t.clientX, w: els.book.offsetWidth,
                time: Date.now(), moving: false };
+      showNeighbours();
       e.stopPropagation();      // no fold, ever: the engine never sees this
     }, true);
 
     els.bookWrap.addEventListener("touchmove", (e) => {
       if (!card) return;
-      if (e.touches.length !== 1) { cardAt(0, CARD_IN); card = null; return; }
+      if (e.touches.length !== 1) { card = null; cardHome(); return; }
       const t = e.touches[0];
       const dx = t.clientX - card.x;
       if (!card.moving) {
@@ -667,13 +714,13 @@
       if (!card) return;
       const { moving, at, x, time, w } = card;
       card = null;
-      if (!moving) return;
+      if (!moving) { hideNeighbours(); return; }
       e.stopPropagation();
       const dx = at - x;
       // Far enough to be meant, or quick enough to be a flick.
       const far = Math.abs(dx) > (w || 300) * CARD_FAR;
       const flick = Date.now() - time < 600 && Math.abs(dx) > 24;
-      if (far || flick) cardTurn(dx < 0); else cardAt(0, CARD_IN);
+      if (far || flick) cardTurn(dx < 0); else cardHome();
     };
     els.bookWrap.addEventListener("touchend", cardDrop, true);
     els.bookWrap.addEventListener("touchcancel", cardDrop, true);

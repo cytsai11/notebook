@@ -366,6 +366,30 @@ body.drawing .pan-catch { display: none !important; }
 
 .book { width: 100%; height: 100%; }
 
+/* The pages either side, parked just off the screen. They live inside the
+   book so a swipe carries them along with it, and the stage clips them until
+   the swipe brings an edge into view. */
+.card-peek {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+.card-peek.prev { left: calc(-100% - 10px); }
+.card-peek.next { left: calc(100% + 10px); }
+
+.card-peek img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
 /* Page surfaces */
 .page {
   background: #fff;
