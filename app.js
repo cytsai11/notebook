@@ -608,8 +608,26 @@
     // The pages on either side, waiting just off the edges of the screen. They
     // sit inside the book, so whatever carries the book carries them too, and
     // a swipe shows the edge of what is coming rather than a bare background.
-    const PEEK_GAP = 10;
+    // The pages sit on the rim of one large wheel, a fixed angle apart, and a
+    // swipe turns the wheel. The circle is worked out from that angle and the
+    // distance between pages: a big radius for a small angle, so the arc is
+    // gentle and the pages lean into each other rather than fanning out.
+    //
+    // The gap is wide enough that a neighbour stays off the screen until the
+    // wheel is actually turned — tapping the page should show nothing.
+    const PEEK_GAP = 56;
+    const ARC_STEP = 15;          // degrees from one page to the next
     let peeks = null;
+
+    function arc() {
+      const w = els.book.offsetWidth, h = els.book.offsetHeight;
+      const chord = w + PEEK_GAP;
+      // Chord of a circle: chord = 2R sin(step / 2).
+      const radius = chord / (2 * Math.sin((ARC_STEP * Math.PI) / 360));
+      els.book.style.setProperty("--arc-step", `${ARC_STEP}deg`);
+      els.book.style.setProperty("--arc-pivot", `${Math.round(h / 2 + radius)}px`);
+      return ARC_STEP;
+    }
 
     function neighbours() {
       if (peeks) return peeks;
@@ -630,6 +648,7 @@
 
     function showNeighbours() {
       const p = neighbours();
+      arc();                    // the wheel depends on the page's size
       const here = current();
       const put = (el, i) => {
         if (i < 0 || i >= state.pageCount) { el.hidden = true; return; }
@@ -648,20 +667,17 @@
       peeks.next.hidden = true;
     }
 
-    // A little tilt as it goes, which is half of what makes this feel like
-    // something being handled rather than a screen changing. The neighbours
-    // ride inside the book, so they lean with it and the strip stays one
-    // piece. Capped, or a long carry would put the page on its ear.
-    const TILT = 0.018, TILT_MAX = 4;
-
+    // Turning the wheel, in degrees. A drag of one page's worth turns it by one
+    // step, so the neighbour it was showing arrives where the page was. The
+    // neighbours are children of the book and pivot about the same point, so
+    // the whole rim turns together.
     function cardAt(dx, ms, deg) {
       const el = els.book;
       el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.22,.61,.36,1)` : "none";
-      const tilt = deg === undefined
-        ? Math.max(-TILT_MAX, Math.min(TILT_MAX, dx * TILT))
-        : deg;
-      if (!dx && !tilt && !ms) { el.style.transform = ""; return; }
-      el.style.transform = `translateX(${Math.round(dx)}px) rotate(${tilt.toFixed(2)}deg)`;
+      const stride = el.offsetWidth + PEEK_GAP;
+      const turn = deg === undefined ? (dx / stride) * ARC_STEP : deg;
+      if (!turn && !ms) { el.style.transform = ""; return; }
+      el.style.transform = `rotate(${turn.toFixed(3)}deg)`;
     }
 
     // Settle back where it was, then put the neighbours away again.
@@ -678,10 +694,9 @@
       // the edge arrives square in the middle. Then the page underneath
       // becomes the page itself and everything drops back to nothing, with no
       // animation to give the swap away.
-      const stride = els.book.offsetWidth + PEEK_GAP;
-      // Straightens as it travels, so the page it hands over to arrives level
-      // and there is no tilt left to snap away at the swap.
-      cardAt(forward ? -stride : stride, CARD_OUT, 0);
+      // Exactly one step of the wheel, so the neighbour that was leaning in at
+      // the edge comes round to where the page was.
+      cardAt(0, CARD_OUT, forward ? -ARC_STEP : ARC_STEP);
       setTimeout(() => {
         goTo(to, true);
         hideNeighbours();

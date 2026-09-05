@@ -364,13 +364,22 @@ body.drawing .pan-catch { display: none !important; }
    page-turn time in app.js so the two move together. */
 .book-wrap.shift-anim { transition: transform .48s cubic-bezier(.32, .72, .3, 1); }
 
-.book { width: 100%; height: 100%; }
+.book {
+  width: 100%;
+  height: 100%;
+  /* Turns about the wheel's centre, well below the page, so a swipe rolls the
+     pages round rather than sliding them across. */
+  transform-origin: 50% var(--arc-pivot, 50%);
+}
 
-/* The pages either side, parked just off the screen. They live inside the
-   book so a swipe carries them along with it, and the stage clips them until
-   the swipe brings an edge into view. */
+/* The pages either side, standing on the rim of one large wheel whose centre
+   is far below the screen. Their own angle puts them where they belong — no
+   offset needed — and because they pivot about the same point as the book
+   that holds them, turning it turns the whole rim as one. The stage clips
+   them until the wheel is actually turned. */
 .card-peek {
   position: absolute;
+  left: 0;
   top: 0;
   width: 100%;
   height: 100%;
@@ -378,10 +387,11 @@ body.drawing .pan-catch { display: none !important; }
   background: #fff;
   box-shadow: var(--shadow-sm);
   pointer-events: none;
+  transform-origin: 50% var(--arc-pivot, 50%);
 }
 
-.card-peek.prev { left: calc(-100% - 10px); }
-.card-peek.next { left: calc(100% + 10px); }
+.card-peek.prev { transform: rotate(calc(-1 * var(--arc-step, 15deg))); }
+.card-peek.next { transform: rotate(var(--arc-step, 15deg)); }
 
 .card-peek img {
   display: block;
