@@ -1245,7 +1245,15 @@
   els.stage.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 2) return;
     cancelPan();          // whatever the first finger began, it was not a drag
-    pinch = { last: spread([e.touches[0], e.touches[1]]), target: state.zoom };
+    const t = [e.touches[0], e.touches[1]];
+    pinch = {
+      last: spread(t),
+      target: state.zoom,
+      // Where the pair sits now, so the very first movement carries the page
+      // rather than being spent working out where they started.
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    };
     hidePeek();
   }, { capture: true, passive: true });
 
@@ -1262,29 +1270,57 @@
 
      Stepping instead means there is no first reading to get wrong, and the
      total is kept inside the range, so coming back down answers immediately. */
-  els.stage.addEventListener("touchmove", (e) => {
-    if (!pinch || e.touches.length !== 2) return;
-    e.preventDefault();                       // no browser page zoom as well
-    const t = [e.touches[0], e.touches[1]];
-    const now = spread(t);
-    if (!now || !pinch.last) return;
+  // Fingers report faster than the screen redraws, and every reading costs a
+  // measure of the page and a write to the scroll. Keep the newest one and
+  // act on it once a frame, so the work matches what can actually be shown.
+  let pinchFrame = 0, pinchAt = null;
 
-    const step = now / pinch.last;
-    pinch.last = now;
+  function stepPinch() {
+    pinchFrame = 0;
+    const to = pinchAt;
+    pinchAt = null;
+    if (!to || !pinch || !pinch.last) return;
+
+    // Sliding two fingers across carries the page with them, so a reader can
+    // move about without letting go and taking hold again.
+    if (state.zoom > 1 && pinch.x != null) {
+      els.stage.scrollLeft -= to.x - pinch.x;
+      els.stage.scrollTop -= to.y - pinch.y;
+    }
+    pinch.x = to.x;
+    pinch.y = to.y;
+
+    const step = to.d / pinch.last;
+    pinch.last = to.d;
     // One frame of a pinch does not multiply the zoom. Anything wilder than
     // this is the touch stream settling, not a hand moving.
     if (!(step > 0.7 && step < 1.4)) return;
 
     const most = ZOOMS[ZOOMS.length - 1], least = ZOOMS[0];
     pinch.target = Math.min(most, Math.max(least, pinch.target * step));
-    setZoom(
-      pinch.target,
-      (t[0].clientX + t[1].clientX) / 2,
-      (t[0].clientY + t[1].clientY) / 2
-    );
+    setZoom(pinch.target, to.x, to.y);
+  }
+
+  els.stage.addEventListener("touchmove", (e) => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();                       // no browser page zoom as well
+    const t = [e.touches[0], e.touches[1]];
+    const d = spread(t);
+    if (!d) return;
+    pinchAt = {
+      d,
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    };
+    if (!pinchFrame) pinchFrame = requestAnimationFrame(stepPinch);
   }, { capture: true, passive: false });
 
-  const endPinch = (e) => { if (!e.touches || e.touches.length < 2) pinch = null; };
+  const endPinch = (e) => {
+    if (e.touches && e.touches.length >= 2) return;
+    if (pinchFrame) { cancelAnimationFrame(pinchFrame); pinchFrame = 0; }
+    pinchAt = null;
+    pinch = null;
+  };
   els.stage.addEventListener("touchend", endPinch, true);
   els.stage.addEventListener("touchcancel", endPinch, true);
 
@@ -1531,8 +1567,32 @@
 
   /* ══ Pen / highlighter / eraser ════════════════════════════════════════ */
 
+  // A pinch reaches the drawing canvas as two pointers, and the pen happily
+  // joined them up — a line straight across the page between the two fingers.
+  // Counting them is the only way to tell one apart from the other, since the
+  // second finger's pointerdown arrives before the touchstart that says a
+  // pinch has begun.
+  let fingers = 0;
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch") fingers++;
+  }, true);
+  const liftFinger = (e) => {
+    if (e.pointerType === "touch") fingers = Math.max(0, fingers - 1);
+  };
+  document.addEventListener("pointerup", liftFinger, true);
+  document.addEventListener("pointercancel", liftFinger, true);
+
   function wireDrawing(canvas, pageIdx) {
     let stroke = null, erased = null;
+
+    // Whatever was being drawn was not meant: throw it away unrecorded and put
+    // the page back as it was.
+    const abandon = () => {
+      if (!stroke && !erased) return;
+      stroke = null;
+      erased = null;
+      redraw(pageIdx);
+    };
 
     const toXY = (e) => {
       const b = canvas.getBoundingClientRect();
@@ -1541,6 +1601,7 @@
     };
 
     canvas.addEventListener("pointerdown", (e) => {
+      if (fingers > 1 || pinch) { abandon(); return; }
       if (!state.tool || !toXY(e)) return;
       e.stopPropagation();
       e.preventDefault();
@@ -1557,6 +1618,7 @@
     });
 
     canvas.addEventListener("pointermove", (e) => {
+      if (fingers > 1 || pinch) { abandon(); return; }
       if (!state.tool) return;
       e.stopPropagation();
       const pt = toXY(e);

@@ -864,6 +864,14 @@ body.drawing .page-inner { cursor: crosshair; }
   bottom: calc(var(--scrub-h) + 16px);
 }
 
+/* The hint says which tool is in hand, so it has to stay said. Zoomed, the
+   stage is what scrolls, and anything pinned to it scrolls away with the
+   page — so it pins to the window instead, clear of the bar underneath. */
+.stage.zoomed .tool-hint {
+  position: fixed;
+  bottom: calc(var(--scrub-h) + 38px);
+}
+
 /* Hint shown while a drawing tool is on */
 .tool-hint {
   position: absolute;
@@ -1569,6 +1577,9 @@ kbd {
   /* The zoom control sits in the bottom corner of the stage, and on a narrow
      screen the hint would sit on top of it. There is empty room above. */
   .tool-hint { top: 12px; bottom: auto; }
+  /* Sits below the topbar rather than above the scrub bar on this size, so
+     it stays where it was rather than crossing the page when zoomed. */
+  .stage.zoomed .tool-hint { top: calc(var(--topbar-h) + 12px); bottom: auto; }
   .mark-head { width: 12px; height: 12px; }
 }
 
@@ -1629,6 +1640,8 @@ kbd {
   /* Pinching is how you zoom a phone, so the control is a button floating
      over the page for no reason. */
   .badge, #btnFullscreen, .zoomer { display: none; }
+  /* The row of navigation tools sits between the topbar and the page here. */
+  .stage.zoomed .tool-hint { top: calc(var(--topbar-h) + 70px); }
   .pbtn { padding: 0 12px; }
   .pbtn span { display: none; }
   .scrubbar { padding: 0 10px; gap: 8px; }
