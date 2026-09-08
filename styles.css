@@ -390,8 +390,8 @@ body.drawing .pan-catch { display: none !important; }
   transform-origin: 50% var(--arc-pivot, 50%);
 }
 
-.card-peek.prev { transform: rotate(calc(-1 * var(--arc-step, 15deg))); }
-.card-peek.next { transform: rotate(var(--arc-step, 15deg)); }
+.card-peek.prev { transform: rotate(calc(-1 * var(--arc-step, 10deg))); }
+.card-peek.next { transform: rotate(var(--arc-step, 10deg)); }
 
 .card-peek img {
   display: block;

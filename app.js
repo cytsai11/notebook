@@ -615,8 +615,8 @@
     //
     // The gap is wide enough that a neighbour stays off the screen until the
     // wheel is actually turned — tapping the page should show nothing.
-    const PEEK_GAP = 56;
-    const ARC_STEP = 15;          // degrees from one page to the next
+    const PEEK_GAP = 96;
+    const ARC_STEP = 10;          // degrees from one page to the next
     let peeks = null;
 
     function arc() {
