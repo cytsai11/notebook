@@ -1,13 +1,15 @@
 {
   "version": 1,
   "bookmarks": [
-    { "label": "Contents", "page": 4, "color": "#FFD84D" },
-    { "label": "Judge's guide", "page": 7, "color": "#FF6B5E" },
-    { "label": "Introduction", "page": 12, "color": "#3EC79C" },
+    { "label": "Contents", "page": 3, "color": "#FFD84D" },
+    { "label": "Judge's guide", "page": 6, "color": "#FF6B5E" },
+    { "label": "Introduction", "page": 11, "color": "#3EC79C" },
     { "label": "Rules & strategy", "page": 30, "color": "#54A8F0" },
-    { "label": "Meeting logs", "page": 40, "color": "#FFD84D" },
-    { "label": "Gen 1 robot", "page": 55, "color": "#FF6B5E" },
-    { "label": "Gen 2 robot", "page": 164, "color": "#3EC79C" },
-    { "label": "Appendix", "page": 238, "color": "#54A8F0" }
+    { "label": "Meeting logs", "page": 44, "color": "#FFD84D" },
+    { "label": "Gen 1 robot", "page": 69, "color": "#FF6B5E" },
+    { "label": "Gen 2 robot", "page": 178, "color": "#3EC79C" },
+    { "label": "Gen 3 robot", "page": 252, "color": "#54A8F0" },
+    { "label": "Competitions", "page": 301, "color": "#FFD84D" },
+    { "label": "Appendix", "page": 317, "color": "#FF6B5E" }
   ]
 }
