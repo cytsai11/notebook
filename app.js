@@ -147,12 +147,13 @@
   function setAuthorMode(on) {
     state.authorMode = on;
     try { localStorage.setItem(LS.author, on ? "1" : "0"); } catch { /* ignore */ }
-    $("btnAuthorMode").textContent = on ? "Author mode is on" : "Turn on author mode";
+    const authorBtn = $("btnAuthorMode");
+    if (authorBtn) authorBtn.textContent = on ? "Author mode is on" : "Turn on author mode";
     syncAuthorBar();
     buildContents();
   }
 
-  $("btnAuthorMode").addEventListener("click", () => {
+  $("btnAuthorMode")?.addEventListener("click", () => {
     setAuthorMode(true);
     closeModal();
     openPanel(els.contentsPanel);
@@ -176,7 +177,7 @@
     syncAuthorBar();
   });
 
-  $("btnResetMine").addEventListener("click", () => {
+  $("btnResetMine")?.addEventListener("click", () => {
     if (!confirm("Erase every mark and personal bookmark you have made in this browser?")) return;
     try {
       localStorage.removeItem(LS.marks(state.pageCount));
