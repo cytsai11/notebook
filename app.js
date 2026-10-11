@@ -2216,7 +2216,7 @@
     pg.textContent = `p.${bm.page}`;
 
     row.append(dot, label, pg);
-    const jump = () => { goTo(bm.page - 1); };
+    const jump = () => { goTo(bm.page - 1); clearPanelOnPhone(); };
     row.addEventListener("click", jump);
     row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } });
     return row;
@@ -2280,7 +2280,7 @@
       wrap.append(head, snip);
       row.appendChild(wrap);
 
-      const go = () => { goTo(i); };
+      const go = () => { goTo(i); clearPanelOnPhone(); };
       row.addEventListener("click", go);
       row.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
       els.searchList.appendChild(row);
@@ -2353,6 +2353,12 @@
   };
 
   /* ══ Panels, modals, floaters ══════════════════════════════════════════ */
+
+  // On a phone the panel covers most of the book, so a tap that jumps to a page
+  // would look like it did nothing. Put the panel away once it has done its job.
+  function clearPanelOnPhone() {
+    if (matchMedia("(max-width: 900px)").matches) closeFloaters();
+  }
 
   function closeFloaters() {
     els.contentsPanel.hidden = true;

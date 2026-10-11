@@ -1615,6 +1615,9 @@ kbd {
      it stays where it was rather than crossing the page when zoomed. */
   .stage.zoomed .tool-hint { top: calc(var(--topbar-h) + 12px); bottom: auto; }
   .mark-head { width: 12px; height: 12px; }
+  /* The marker is a dozen pixels wide. A larger invisible patch above it
+     gives a thumb something to land on. */
+  .mark::before { content: ""; position: absolute; left: -2px; right: -2px; top: -16px; bottom: -4px; }
 }
 
 @media (max-width: 620px) {
