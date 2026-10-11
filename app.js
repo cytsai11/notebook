@@ -394,32 +394,58 @@
     }
   }
 
+  // Bumped on every call so a stale, deferred second stage can tell it has been
+  // overtaken by a newer jump and stand down.
+  let nearSeq = 0;
+
   function showNear() {
     const cur = current();
+    const my = ++nearSeq;
     const { attach: reachAttach } = reach();
-    // Nearest first, so the page being read is the first request made rather
-    // than waiting behind its neighbours in page order.
-    for (let d = 0; d <= reachAttach; d++) {
-      for (const i of d ? [cur - d, cur + d] : [cur]) {
-        const rec = state.pages[i];
-        if (rec) attach(rec, i, d);
-      }
+    const onScreen = visiblePages(cur);
+
+    // The pages being looked at go first, and alone: on a slow connection the
+    // neighbours would otherwise share the line with them, and a jump would sit
+    // on a blank page until all of it had arrived.
+    for (const i of onScreen) {
+      const rec = state.pages[i];
+      if (rec) attach(rec, i, 0);
     }
+
+    const rest = () => {
+      if (my !== nearSeq) return;
+      for (let d = 1; d <= reachAttach; d++) {
+        for (const i of [cur - d, cur + d]) {
+          const rec = state.pages[i];
+          if (rec && onScreen.indexOf(i) === -1) attach(rec, i, d);
+        }
+      }
+      sharpen();
+    };
+
+    const lead = warmed.get(cur);
+    if (lead && !(lead.complete && lead.naturalWidth)) {
+      let started = false;
+      const go = () => { if (!started) { started = true; rest(); } };
+      lead.addEventListener("load", go, { once: true });
+      lead.addEventListener("error", go, { once: true });
+      setTimeout(go, 2500);               // never wait on a stalled request
+    } else {
+      rest();
+    }
+
     for (let i = 0; i < state.pageCount; i++) {
       const rec = state.pages[i];
-      if (!rec) continue;
+      if (!rec || !rec.level) continue;
       if (Math.abs(i - cur) <= reachAttach) continue;
-      if (rec.level) {
-        rec.level = null;
-        rec.seq++;
-        if (rec.fade) { clearTimeout(rec.fade); rec.fade = 0; }
-        for (const im of rec.imgs) { im.classList.remove("ready"); im.removeAttribute("src"); }
-        rec.front = 0;
-        rec.inner.style.backgroundImage = "";
-        if (rec.loading) rec.loading.hidden = false;
-      }
+      rec.level = null;
+      rec.seq++;
+      if (rec.fade) { clearTimeout(rec.fade); rec.fade = 0; }
+      for (const im of rec.imgs) { im.classList.remove("ready"); im.removeAttribute("src"); }
+      rec.front = 0;
+      rec.inner.style.backgroundImage = "";
+      if (rec.loading) rec.loading.hidden = false;
     }
-    sharpen();
   }
 
   // Reading size is what every nearby page carries; it is sharp at the size a
@@ -448,6 +474,8 @@
     }
     const { warm: reachWarm, decode: reachDecode } = reach();
     for (let d = 0; d <= reachWarm; d++) {
+      // Neighbours wait until the page being read has arrived.
+      if (d > 0 && !bitmapReady(cur)) break;
       warm(cur - d, d <= reachDecode, d);
       warm(cur + d, d <= reachDecode, d);
     }
