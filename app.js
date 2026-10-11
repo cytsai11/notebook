@@ -1282,7 +1282,43 @@
     if (want !== null) goTo(want, true);
   });
 
+  // Anonymous page counts through GoatCounter: no cookies, no personal data.
+  // A page only counts once it has stayed open a few seconds, so flicking past
+  // does not. Nothing is sent from a local copy, when the browser asks not to
+  // be tracked, or after visiting the site once with ?notrack (the author's).
+  const COUNT_URL = "https://cytsai11.goatcounter.com/count";
+  const COUNT_AFTER = 3000;
+  let countTimer = 0;
+
+  try {
+    if (/[?&]notrack/.test(location.search)) localStorage.setItem("nb-notrack", "1");
+    if (/[?&]track/.test(location.search)) localStorage.removeItem("nb-notrack");
+  } catch { /* ignore */ }
+
+  function countingOn() {
+    if (!/\.github\.io$/.test(location.hostname)) return false;
+    if (navigator.doNotTrack === "1" || window.doNotTrack === "1") return false;
+    try { if (localStorage.getItem("nb-notrack")) return false; } catch { /* ignore */ }
+    return true;
+  }
+
+  function countPage(idx) {
+    clearTimeout(countTimer);
+    if (!countingOn()) return;
+    countTimer = setTimeout(() => {
+      if (document.hidden) return;
+      const shown = [idx + 1];
+      const spread = state.pf && state.pf.getOrientation() === "landscape";
+      if (spread && idx > 0 && idx + 1 < state.pageCount) shown.push(idx + 2);
+      for (const n of shown) {
+        const p = "/p/" + String(n).padStart(3, "0");
+        new Image().src = `${COUNT_URL}?p=${encodeURIComponent(p)}&t=${encodeURIComponent("Page " + n)}`;
+      }
+    }, COUNT_AFTER);
+  }
+
   function syncUI(idx) {
+    countPage(idx);
     els.pageInput.value = idx + 1;
     els.pageSlider.value = idx + 1;
     $("btnPrev").disabled = idx <= 0;
