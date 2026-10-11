@@ -267,6 +267,7 @@
     // The words for search are not needed until someone searches, and on a
     // phone they would share the connection with the first page.
     setTimeout(loadSearchText, 3500);
+    setTimeout(prefetchLikely, 5000);
     firstRunWelcome();
   }
 
@@ -313,6 +314,37 @@
       im.decode().catch(() => { /* replaced or failed — nothing to prepare */ });
     }
     return im;
+  }
+
+  // The host answers each request in anywhere from a twentieth of a second to
+  // two seconds, whatever the connection, so a page that has to be asked for
+  // first can sit blank for a moment. The places a reader is most likely to go
+  // — the author's bookmarks, then every thumbnail — are fetched quietly once
+  // the first page is up, a few at a time. Skipped on data savers and slow
+  // connections, where it would cost more than it gives.
+  const held = [];
+  function prefetchLikely() {
+    const c = navigator.connection;
+    if (c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || ""))) return;
+
+    const jobs = [];
+    for (const b of state.author.concat(state.mine)) jobs.push({ page: b.page - 1, read: true });
+    for (let i = 0; i < state.pageCount; i++) jobs.push({ page: i, read: false });
+
+    let at = 0;
+    const step = () => {
+      if (document.hidden) { setTimeout(step, 2000); return; }
+      for (let n = 0; n < 4 && at < jobs.length; n++, at++) {
+        const j = jobs[at];
+        const im = new Image();
+        im.decoding = "async";
+        im.fetchPriority = "low";
+        im.src = j.read ? readUrl(j.page) : thumbUrl(j.page);
+        if (j.read) held.push(im);          // keep the request alive to completion
+      }
+      if (at < jobs.length) setTimeout(step, 350);
+    };
+    step();
   }
 
   const bitmapReady = (i) => {
@@ -2136,6 +2168,7 @@
     stem.style.background = bm.color;
 
     m.append(head, stem);
+    m.addEventListener("pointerdown", () => warm(bm.page - 1, true, 0));
     m.addEventListener("click", () => goTo(bm.page - 1));
 
     // Author mode (and your own bookmarks) can be removed straight off the bar.
@@ -2270,6 +2303,7 @@
 
     row.append(dot, label, pg);
     const jump = () => { goTo(bm.page - 1); clearPanelOnPhone(); };
+    row.addEventListener("pointerdown", () => warm(bm.page - 1, true, 0));
     row.addEventListener("click", jump);
     row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); } });
     return row;
@@ -2334,6 +2368,7 @@
       row.appendChild(wrap);
 
       const go = () => { goTo(i); clearPanelOnPhone(); };
+      row.addEventListener("pointerdown", () => warm(i, true, 0));
       row.addEventListener("click", go);
       row.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
       els.searchList.appendChild(row);
