@@ -264,7 +264,9 @@
 
     syncUI(current());
     showNear();
-    loadSearchText();
+    // The words for search are not needed until someone searches, and on a
+    // phone they would share the connection with the first page.
+    setTimeout(loadSearchText, 3500);
     firstRunWelcome();
   }
 
@@ -274,24 +276,33 @@
      ones it has fetched, so turning back is instant. */
 
   const FADE_MS = 220;   // must match .page-img's transition in styles.css
-  const ATTACH = 4;   // pages carrying an image at all
-  const DECODE = 5;   // pages whose picture is turned into a bitmap in advance
-  const WARM = 8;     // pages pulled into the browser cache ahead of the reader
+  // How far from the reader each step reaches. A phone shows one page on a
+  // slower connection with less memory, so it fetches a few pages around the
+  // reader instead of nine at once, which would queue the page being read
+  // behind pages nobody is looking at yet.
+  const REACH = {
+    phone:   { attach: 2, decode: 2, warm: 3 },
+    desktop: { attach: 4, decode: 5, warm: 8 },
+  };
+  const reach = () => (matchMedia("(max-width: 900px)").matches ? REACH.phone : REACH.desktop);
+  const WARM_MAX = REACH.desktop.warm;
 
   // Fetched but not attached. Holding the Image keeps the request alive; the
   // bytes then sit in the browser cache, so attaching later costs no network.
   const warmed = new Map();
 
-  function warm(i, prepare) {
+  function warm(i, prepare, distance = 0) {
     if (i < 0 || i >= state.pageCount) return null;
     let im = warmed.get(i);
     if (!im) {
       im = new Image();
       im.decoding = "async";
+      // The page being read comes first; the rest wait their turn.
+      im.fetchPriority = distance === 0 ? "high" : distance === 1 ? "auto" : "low";
       warmed.set(i, im);
       im.src = readUrl(i);
       // Bound the set, or a long read would hold every page open at once.
-      if (warmed.size > WARM * 2 + 6) warmed.delete(warmed.keys().next().value);
+      if (warmed.size > WARM_MAX * 2 + 6) warmed.delete(warmed.keys().next().value);
     }
     // Decoding here, while nothing is moving, is the point of the whole
     // exercise: the page a turn lands on is already a finished bitmap, so it
@@ -309,9 +320,9 @@
     return !!(im && im.complete && im.naturalWidth);
   };
 
-  function attach(rec, i) {
+  function attach(rec, i, distance = 0) {
     if (rec.level) return;
-    warm(i, true);
+    warm(i, true, distance);
 
     // The thumbnail sits behind the real image as a backdrop, never as a
     // stand-in that has to be swapped out. When the reading image is already
@@ -385,12 +396,20 @@
 
   function showNear() {
     const cur = current();
+    const { attach: reachAttach } = reach();
+    // Nearest first, so the page being read is the first request made rather
+    // than waiting behind its neighbours in page order.
+    for (let d = 0; d <= reachAttach; d++) {
+      for (const i of d ? [cur - d, cur + d] : [cur]) {
+        const rec = state.pages[i];
+        if (rec) attach(rec, i, d);
+      }
+    }
     for (let i = 0; i < state.pageCount; i++) {
       const rec = state.pages[i];
       if (!rec) continue;
-      if (Math.abs(i - cur) <= ATTACH) {
-        attach(rec, i);
-      } else if (rec.level) {
+      if (Math.abs(i - cur) <= reachAttach) continue;
+      if (rec.level) {
         rec.level = null;
         rec.seq++;
         if (rec.fade) { clearTimeout(rec.fade); rec.fade = 0; }
@@ -427,9 +446,10 @@
         setLevel(rec, i, "read");
       }
     }
-    for (let d = 0; d <= WARM; d++) {
-      warm(cur - d, d <= DECODE);
-      warm(cur + d, d <= DECODE);
+    const { warm: reachWarm, decode: reachDecode } = reach();
+    for (let d = 0; d <= reachWarm; d++) {
+      warm(cur - d, d <= reachDecode, d);
+      warm(cur + d, d <= reachDecode, d);
     }
   }
 
@@ -446,6 +466,7 @@
     els.searchStatus.textContent = state.text.length
       ? `Type a word above to search all ${state.pageCount} pages.`
       : "Search is unavailable — pages/text.json could not be read.";
+    if (state.text.length && els.searchInput.value.trim().length >= 2) runSearch();
   }
 
   /* ══ Page DOM ══════════════════════════════════════════════════════════ */
@@ -1237,7 +1258,11 @@
     if (idx === current()) return;
     noteJump(current(), idx);
     // Opening straight onto a deep link should not animate 200 pages past.
-    if (instant && state.pf.turnToPage) {
+    // The library's own page-to-page flip cannot turn back in single-page
+    // mode (it drops the book's offset), so a bookmark behind the reader did
+    // nothing on a phone. A jump of more than a page is not a turn anyway.
+    const single = state.pf.getOrientation() === "portrait";
+    if ((instant || (single && Math.abs(idx - current()) > 1)) && state.pf.turnToPage) {
       state.pf.turnToPage(idx);
       // Sync against the page we asked for, not getCurrentPageIndex(): the
       // library does not update that synchronously, so reading it back here
