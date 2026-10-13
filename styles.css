@@ -457,6 +457,7 @@ body.drawing .pan-catch { display: none !important; }
 
 .link-layer a { cursor: pointer; }        /* internal links carry no href */
 .link-layer a:hover { background: rgba(84, 168, 240, .28); }
+.link-layer a.hot { background: rgba(84, 168, 240, .28); outline: 2px solid rgba(84, 168, 240, .7); }
 .link-layer a:focus-visible { background: rgba(84, 168, 240, .28); }
 
 /* ── Link hover preview ──────────────────────────────────────────────── */

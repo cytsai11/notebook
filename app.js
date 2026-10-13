@@ -1195,7 +1195,7 @@
     if (panFrame) { cancelAnimationFrame(panFrame); panFrame = 0; }
     flushPan();                       // land on the last position, not a stale one
     els.stage.classList.remove("grabbing");
-    if (pan.forwards && pan.moved < 4) forwardClick(e.clientX, e.clientY);
+    if (pan.forwards && pan.moved < 4 && Date.now() - pan.t0 < 600 && !pinch) tapThrough(e, pan.link);
     pan = null;
     state.panning = false;
   }
@@ -1203,6 +1203,8 @@
   panCatch.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || pinch) return;   // middle button bubbles to the stage
     startPan(panCatch, e, true);
+    pan.link = linkAt(e.clientX, e.clientY);   // what was pressed, to match against what is released
+    pan.t0 = Date.now();
   });
   panCatch.addEventListener("pointermove", movePan);
   panCatch.addEventListener("pointerup", endPan);
@@ -1221,11 +1223,81 @@
   els.stage.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   els.stage.addEventListener("auxclick", (e) => { if (e.button === 1) e.preventDefault(); });
 
-  function forwardClick(x, y) {
-    panCatch.style.display = "none";
-    const target = document.elementFromPoint(x, y);
-    panCatch.style.display = "";
-    if (target && target.closest(".link-layer, .tab")) target.click();
+  /* ══ Links while zoomed ═══════════════════════════════════════════════
+     The catcher sits over the book so a drag pans, which also hides the links
+     from the pointer. They are found by position instead. A link is followed
+     only by a short, still tap that starts and ends on the same link, so a
+     drag that happens to finish on one does nothing. A mouse previews on hover;
+     a finger previews on the first tap and follows on the second. */
+
+  const linkAt = (x, y) => {
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (el.matches && el.matches(".link-layer a")) return el;
+    }
+    return null;
+  };
+
+  let hot = null, armTimer = 0, hoverFrame = 0, hoverAt = null;
+
+  function setHot(link) {
+    if (hot === link) return;
+    if (hot) hot.classList.remove("hot");
+    hot = link;
+    if (hot) hot.classList.add("hot");
+    panCatch.style.cursor = hot ? "pointer" : "";
+  }
+
+  function disarm() {
+    clearTimeout(armTimer);
+    armTimer = 0;
+    if (hot) hidePeek();
+    setHot(null);
+  }
+
+  function hoverThrough(e) {
+    hoverAt = { x: e.clientX, y: e.clientY };
+    if (hoverFrame) return;
+    hoverFrame = requestAnimationFrame(() => {
+      hoverFrame = 0;
+      if (!hoverAt || pan) return;
+      const link = linkAt(hoverAt.x, hoverAt.y);
+      if (link === hot) return;
+      clearTimeout(peekTimer);
+      hidePeek();
+      setHot(link);
+      if (link) {
+        peekTimer = setTimeout(() => { buildPeek(link); placePeek(link); }, 180);
+      }
+    });
+  }
+
+  panCatch.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "mouse" && !pan) hoverThrough(e);
+  });
+  panCatch.addEventListener("pointerleave", () => { if (!pan) disarm(); });
+
+  function tapThrough(e, pressed) {
+    const link = linkAt(e.clientX, e.clientY);
+    if (!link) {
+      // Not a notebook link: the bookmark tabs on the book are still reachable.
+      panCatch.style.display = "none";
+      const t = document.elementFromPoint(e.clientX, e.clientY);
+      panCatch.style.display = "";
+      if (t && t.closest(".tab")) t.click();
+      disarm();
+      return;
+    }
+    if (link !== pressed) return;                       // pressed here, let go there
+    if (e.pointerType === "touch" && hot !== link) {    // first tap: show where it goes
+      disarm();
+      setHot(link);
+      buildPeek(link);
+      placePeek(link);
+      armTimer = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    link.click();
   }
 
   els.zoomPad.addEventListener("dblclick", (e) => {
