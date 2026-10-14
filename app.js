@@ -1195,7 +1195,9 @@
     if (panFrame) { cancelAnimationFrame(panFrame); panFrame = 0; }
     flushPan();                       // land on the last position, not a stale one
     els.stage.classList.remove("grabbing");
-    if (pan.forwards && pan.moved < 4 && Date.now() - pan.t0 < 600 && !pinch) tapThrough(e, pan.link);
+    // A fingertip drifts several pixels in a plain tap; a mouse hardly moves.
+    const slop = e.pointerType === "touch" ? 10 : 4;
+    if (pan.forwards && pan.moved < slop && Date.now() - pan.t0 < 600 && !pinch) tapThrough(e, pan.link);
     pan = null;
     state.panning = false;
   }
@@ -1203,7 +1205,7 @@
   panCatch.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || pinch) return;   // middle button bubbles to the stage
     startPan(panCatch, e, true);
-    pan.link = linkAt(e.clientX, e.clientY);   // what was pressed, to match against what is released
+    pan.link = pressedLink(e);   // what was pressed, to match against what is released
     pan.t0 = Date.now();
   });
   panCatch.addEventListener("pointermove", movePan);
@@ -1276,8 +1278,16 @@
   });
   panCatch.addEventListener("pointerleave", () => { if (!pan) disarm(); });
 
+  // The link a press or release means. A mouse points at it exactly; a finger
+  // is given the nearest one within reach, since it covers more than a line.
+  function pressedLink(e) {
+    if (e.pointerType !== "touch") return linkAt(e.clientX, e.clientY);
+    const near = linksNear(e.clientX, e.clientY);
+    return near.length ? near[0].el : null;
+  }
+
   function tapThrough(e, pressed) {
-    const link = linkAt(e.clientX, e.clientY);
+    const link = pressedLink(e);
     if (!link) {
       // Not a notebook link: the bookmark tabs on the book are still reachable.
       panCatch.style.display = "none";
@@ -1287,7 +1297,7 @@
       disarm();
       return;
     }
-    if (link !== pressed) return;                       // pressed here, let go there
+    if (e.pointerType !== "touch" && link !== pressed) return;   // pressed here, let go there
     if (e.pointerType === "touch" && hot !== link) {    // first tap: show where it goes
       disarm();
       setHot(link);
