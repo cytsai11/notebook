@@ -1276,7 +1276,9 @@
   panCatch.addEventListener("pointermove", (e) => {
     if (e.pointerType === "mouse" && !pan) hoverThrough(e);
   });
-  panCatch.addEventListener("pointerleave", () => { if (!pan) disarm(); });
+  // Only a mouse leaving means the hover is over. A finger always "leaves" the
+  // instant it lifts, which would wipe the highlight a first tap has just set.
+  panCatch.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !pan) disarm(); });
 
   // The link a press or release means. A mouse points at it exactly; a finger
   // is given the nearest one within reach, since it covers more than a line.
