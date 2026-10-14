@@ -1313,13 +1313,13 @@
   /* ══ Links under a fingertip ══════════════════════════════════════════
      On a phone the lines of a contents page are ten pixels tall and twelve
      apart; a fingertip covers several of them. A tap near links is therefore
-     resolved to the nearest one. When only one is close it just opens; when
-     several are, the first tap shows which one was meant and the second opens
-     it, so a crowded list never sends the reader somewhere they did not ask for. */
+     resolved to the nearest one: the first tap shows which one was meant, the
+     second opens it, so the reader is never sent somewhere they did not ask for. */
 
   let lastPointer = "mouse";
   document.addEventListener("pointerdown", (e) => { lastPointer = e.pointerType; }, true);
 
+  const CONFIRM_EVERY_TAP = true;
   const TOUCH_REACH = 18;    // px: how far from a link a tap still means it
 
   function linksNear(x, y) {
@@ -1344,12 +1344,14 @@
     const near = linksNear(e.clientX, e.clientY);
     if (!near.length) { disarm(); return; }
     const best = near[0].el;
-    const crowded = near.length > 1;
-    if (!crowded) {
-      if (e.target.closest && e.target.closest(".link-layer a") === best) return;   // a clean hit
+    // Every link taps the same way: the first tap shows where it goes, the
+    // second opens it. One rule, so it never feels like a coin toss. (Set
+    // CONFIRM_EVERY_TAP to false to open a lone link at once.)
+    if (!CONFIRM_EVERY_TAP && near.length === 1) {
+      if (e.target.closest && e.target.closest(".link-layer a") === best) return;
       e.preventDefault();
       e.stopPropagation();
-      best.click();                                          // a near miss on a lone link
+      best.click();
       return;
     }
     e.preventDefault();
