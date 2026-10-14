@@ -513,6 +513,10 @@ body.drawing .pan-catch { display: none !important; }
   display: block;
 }
 
+/* Zoomed in: one step up, not in proportion to the zoom. */
+.link-peek.big { max-width: 400px; }
+.link-peek.big .peek-shot { width: 132px; }
+
 .peek-shot.empty {
   display: grid;
   place-items: center;

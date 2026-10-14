@@ -1627,7 +1627,10 @@
   function buildPeek(link) {
     peek.innerHTML = "";
     peekLink = link;
-    peek.classList.remove("is-url", "is-tip");
+    peek.classList.remove("is-url", "is-tip", "big");
+    // Zoomed in, the card is a notch larger so the page it names can be read —
+    // one fixed step, not scaled with the zoom, or it would cover what you are reading.
+    if (state.zoom > 1.2 && link.dataset.peek === "page") peek.classList.add("big");
 
     // A control saying what it does. The browser will do this itself from a
     // title attribute, but that tooltip cannot be styled, arrives on its own
